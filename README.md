@@ -1,2 +1,2 @@
-# dec-eve
+# dec-eve-serenity
 Decompiled client
