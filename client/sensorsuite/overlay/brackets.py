@@ -202,6 +202,7 @@ class SensorSuiteBracket(Bracket):
 
     def OnClick(self, *args):
         sm.GetService('state').SetState(self.data.ballID, selected, 1)
+        uicore.cmd.ExecuteCombatCommand(self.data.ballID, uiconst.UI_CLICK)
 
     def OnMouseEnter(self, *args):
         self.labelContainer.display = True
@@ -230,6 +231,7 @@ class SensorSuiteBracket(Bracket):
         if not self.radialMenuSprite:
             self.radialMenuSprite = Sprite(name='radialMenuSprite', parent=self, texturePath='res:/UI/Texture/classes/RadialMenu/bracketHilite.png', pos=(0, 0, 20, 20), color=(0.5, 0.5, 0.5, 0.5), align=uiconst.CENTER, state=uiconst.UI_DISABLED)
         self.radialMenuSprite.display = True
+        self.labelContainer.display = False
 
     def HideRadialMenuIndicator(self, slimItem = None, *args):
         if self.radialMenuSprite:

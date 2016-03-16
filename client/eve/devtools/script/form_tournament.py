@@ -164,7 +164,7 @@ class DropShadowElement(object):
 
 class TournamentWindow(uicontrols.Window):
     __guid__ = 'form.tournament'
-    __neocommenuitem__ = (('Tournament Manager', 'tournament'), True, ROLE_GML)
+    __neocommenuitem__ = (('Tournament Camera Tool', 'tournament'), True, ROLE_GML)
     default_windowID = 'tournament'
 
     def ApplyAttributes(self, attributes):
@@ -175,7 +175,7 @@ class TournamentWindow(uicontrols.Window):
         self.width = 300
         self.SetScope('all')
         self.SetWndIcon(None)
-        self.SetCaption('Tournament Manager')
+        self.SetCaption('Tournament Camera Tool')
         self.SetTopparentHeight(0)
         self.SetMinSize([self.width, self.height])
         self.MakeUnResizeable()

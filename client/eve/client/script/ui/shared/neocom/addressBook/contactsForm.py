@@ -6,6 +6,8 @@ import uiprimitives
 import uicontrols
 from carbonui.primitives.containerAutoSize import ContainerAutoSize
 from carbonui.primitives.frame import Frame
+from carbonui.primitives.layoutGrid import LayoutGrid
+from eve.client.script.ui.control.checkbox import Checkbox
 import uthread
 import uix
 import uiutil
@@ -44,18 +46,19 @@ class ContactsForm(uiprimitives.Container):
     def DrawStuff(self, *args):
         self.sr.topCont = uiprimitives.Container(name='topCont', parent=self, align=uiconst.TOTOP, pos=(0, 0, 0, 45))
         self.sr.mainCont = uiprimitives.Container(name='mainCont', parent=self, align=uiconst.TOALL, pos=(0, 0, 0, 0))
-        self.sr.topLeft = uiprimitives.Container(name='topCont', parent=self.sr.topCont, align=uiconst.TOALL, pos=(0, 0, 0, 0), padding=(const.defaultPadding,
-         0,
-         0,
-         0))
+        inputsGrid = LayoutGrid(parent=self.sr.topCont, columns=2, top=6, left=const.defaultPadding, cellSpacing=2)
         self.sr.topRight = uiprimitives.Container(name='topCont', parent=self.sr.topCont, align=uiconst.TORIGHT, pos=(0, 0, 50, 0))
-        self.quickFilter = uicls.QuickFilterEdit(parent=self.sr.topLeft, left=const.defaultPadding, top=8)
+        self.quickFilter = uicls.QuickFilterEdit(parent=inputsGrid)
         self.quickFilter.ReloadFunction = lambda : self.LoadContactsForm(self.contactType)
-        self.sr.onlinecheck = uicontrols.Checkbox(text=localization.GetByLabel('UI/PeopleAndPlaces/OnlineOnly'), parent=self.sr.topLeft, configName='onlinebuddyonly', retval=1, checked=settings.user.ui.Get('onlinebuddyonly', 0), groupname=None, callback=self.CheckBoxChange, align=uiconst.TOPLEFT, pos=(0, 30, 100, 0))
         if sm.GetService('addressbook').ShowLabelMenuAndManageBtn(self.formType):
-            labelBtn = uix.GetBigButton(size=32, where=self.sr.topLeft, left=115, top=8, hint=localization.GetByLabel('UI/PeopleAndPlaces/LabelsManageLabels'), align=uiconst.RELATIVE)
+            labelBtn = uix.GetBigButton(size=32, hint=localization.GetByLabel('UI/PeopleAndPlaces/LabelsManageLabels'), align=uiconst.RELATIVE)
             uiutil.MapIcon(labelBtn.sr.icon, 'res:/ui/Texture/WindowIcons/evemailtag.png', ignoreSize=True)
             labelBtn.OnClick = self.ManageLabels
+            inputsGrid.AddCell(labelBtn, rowSpan=2)
+        else:
+            inputsGrid.AddCell()
+        self.sr.onlinecheck = Checkbox(text=localization.GetByLabel('UI/PeopleAndPlaces/OnlineOnly'), parent=inputsGrid, configName='onlinebuddyonly', retval=1, checked=settings.user.ui.Get('onlinebuddyonly', 0), groupname=None, callback=self.CheckBoxChange, align=uiconst.TOPLEFT, wrapLabel=False)
+        self.quickFilter.width = max(self.quickFilter.width, self.sr.onlinecheck.width)
         btn = uix.GetBigButton(24, self.sr.topRight, 32, const.defaultPadding)
         btn.OnClick = (self.BrowseContacts, -1)
         btn.hint = localization.GetByLabel('UI/Common/Previous')

@@ -7,7 +7,7 @@ from eveInflight.damageStateValue import CalculateCurrentDamageStateValues
 from inventorycommon.util import IsModularShip
 import log
 import stackless
-from spacecomponents.client.messages import MSG_ON_SLIM_ITEM_UPDATED, MSG_ON_ADDED_TO_SPACE
+from spacecomponents.client.messages import MSG_ON_SLIM_ITEM_UPDATED, MSG_ON_ADDED_TO_SPACE, MSG_ON_REMOVED_FROM_SPACE
 from spacecomponents.common.componentregistry import ComponentRegistry, CreateComponentMapping
 import uthread
 import destiny
@@ -1054,9 +1054,11 @@ class Park(decometaclass.WrapBlueClass('destiny.Ballpark')):
                 del self.slimItems[ballID]
 
     def DeleteComponents(self, itemID):
+        if self.componentRegistry is None:
+            return
+        self.componentRegistry.SendMessageToItem(itemID, MSG_ON_REMOVED_FROM_SPACE)
         try:
-            if self.componentRegistry is not None:
-                self.componentRegistry.DeleteComponentInstances(itemID)
+            self.componentRegistry.DeleteComponentInstances(itemID)
         except KeyError:
             pass
 
@@ -1232,3 +1234,17 @@ class Park(decometaclass.WrapBlueClass('destiny.Ballpark')):
 
     def GetSpewContainerManager(self):
         return self.spewContainerManager
+
+    def GetBallsInRange(self, fromID, radius):
+        balls = []
+        for ballID in self.balls.iterkeys():
+            if ballID == fromID:
+                continue
+            distance = self.GetSurfaceDist(fromID, ballID)
+            if distance is not None and distance < radius:
+                balls.append(ballID)
+
+        return balls
+
+    def GetComponentRegistry(self):
+        return self.componentRegistry

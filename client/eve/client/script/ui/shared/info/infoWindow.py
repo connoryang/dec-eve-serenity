@@ -4,7 +4,7 @@ from carbon.common.lib.const import DAY
 from carbon.common.script.util.linkUtil import GetShowInfoLink, IsLink
 from entosis.entosisConst import EVENT_TYPE_TCU_DEFENSE, EVENT_TYPE_IHUB_DEFENSE
 from eve.client.script.ui.control.eveIcon import Icon
-from eve.client.script.ui.control.eveLabel import Label
+from eve.client.script.ui.control.eveLabel import EveLabelMedium, Label
 from eve.client.script.ui.shared.industry.views.containersMETE import ContainerTE, ContainerME
 from eve.client.script.ui.shared.info.panels.PanelSovConstellation import PanelSovConstellation
 from eve.client.script.ui.shared.info.panels.panelSov import PanelSov
@@ -51,7 +51,8 @@ from eve.client.script.ui.shared.info.panels.panelFitting import PanelFitting
 from eve.client.script.ui.shared.monetization.trialPopup import ORIGIN_SHOWINFO
 from eve.client.script.ui.shared.skins.buyButton import SkinLicenseBuyButtonAur
 from eve.client.script.ui.shared.skins.uiutil import GetMaterialDragData
-from eve.client.script.ui.shared.vgs.button import BuyButtonPlex
+from eve.client.script.ui.shared.vgs.button import BuyButtonAurSmall, BuyButtonPlex
+from carbonui.util.color import Color
 MINWIDTH = 325
 MINHEIGHTREGULAR = 280
 MINHEIGHTMEDAL = 480
@@ -487,6 +488,10 @@ class InfoWindow(Window):
             self.ContructHeaderCommandNodeBeacon()
         elif self.IsType(TYPE_PLEX):
             self.ConstructHeaderPlex()
+        elif self.IsType(TYPE_SKILLINJECTOR):
+            self.ConstructHeaderSkillInjector()
+        elif self.IsType(TYPE_SKILLEXTRACTOR):
+            self.ConstructHeaderSkillExtractor()
 
     def ConstructHeaderCharacter(self):
         corpid = None
@@ -805,6 +810,17 @@ class InfoWindow(Window):
     def ConstructHeaderPlex(self):
         buttonCont = ContainerAutoSize(parent=self.therestcontainer, align=uiconst.TOTOP)
         BuyButtonPlex(parent=buttonCont, align=uiconst.TOPLEFT, logContext='InfoWindow')
+
+    def ConstructHeaderSkillInjector(self):
+        if not session.charid:
+            return
+        points = sm.GetService('skills').GetSkillPointAmountFromInjectors(quantity=1)
+        text = localization.GetByLabel('UI/SkillTrading/SkillInjectorYield', points=points, charID=session.charid, color=Color.RGBtoHex(1.0, 0.8, 0.0))
+        EveLabelMedium(parent=self.therestcontainer, align=uiconst.TOTOP, text=text)
+
+    def ConstructHeaderSkillExtractor(self):
+        buttonCont = ContainerAutoSize(parent=self.therestcontainer, align=uiconst.TOTOP)
+        BuyButtonAurSmall(parent=buttonCont, align=uiconst.TOPLEFT, types=[self.typeID])
 
     def ContructHeaderCommandNodeBeacon(self):
         ballpark = sm.GetService('michelle').GetBallpark()

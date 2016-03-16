@@ -84,11 +84,12 @@ def GetEwarTypeByEffectID(effectID):
         return 'electronic'
     if effect.propulsionChance:
         return 'propulsion'
-    ewarType = ALLEWARTYPES.get(effectID, None)
+    ewarType = ALL_EWAR_TYPES.get(effectID, None)
     return ewarType
 
 
-ALLEWARTYPES = {const.effectEwTargetPaint: 'ewTargetPaint',
+ALL_EWAR_TYPES = {}
+OFFENSIVE_EWAR_TYPES = {const.effectEwTargetPaint: 'ewTargetPaint',
  const.effectTargetMaxTargetRangeAndScanResolutionBonusHostile: 'ewRemoteSensorDamp',
  const.effectTargetGunneryMaxRangeAndTrackingSpeedBonusHostile: 'ewTrackingDisrupt',
  const.effectTargetGunneryMaxRangeAndTrackingSpeedAndFalloffBonusHostile: 'ewTrackingDisrupt',
@@ -97,8 +98,8 @@ ALLEWARTYPES = {const.effectEwTargetPaint: 'ewTargetPaint',
  const.effectSensorBoostTargetedHostile: 'ewRemoteSensorDamp',
  const.effectEntityTrackingDisrupt: 'ewTrackingDisrupt',
  const.effectGuidanceDisrupt: 'ewGuidanceDisrupt',
- const.effectEntityTargetPaint: 'ewTargetPaint'}
-SERVEREWARTYPES = {const.effectWarpScramble: 'warpScrambler',
+ const.effectEntityTargetPaint: 'ewTargetPaint',
+ const.effectWarpScramble: 'warpScrambler',
  const.effectDecreaseTargetSpeed: 'webify',
  const.effectWarpScrambleForEntity: 'warpScrambler',
  const.effectModifyTargetSpeed2: 'webify',
@@ -115,5 +116,19 @@ SERVEREWARTYPES = {const.effectWarpScramble: 'warpScrambler',
  const.effectWarpScrambleForStructure: 'warpScrambler',
  const.effectDecreaseTargetSpeedForStructures: 'webify',
  const.effectEssWarpScramble: 'warpScrambler',
- const.effectWarpScrambleTargetMWDBlockActivationForEntity: 'warpScramblerMWD'}
-ALLEWARTYPES.update(SERVEREWARTYPES)
+ const.effectWarpScrambleTargetMWDBlockActivationForEntity: 'warpScramblerMWD',
+ const.effectEwTestEffectJam: 'electronic',
+ const.effectEntityTargetJam: 'electronic'}
+DEFENSIVE_EWAR_TYPES = {const.effectRemoteTracking: 'remoteTracking',
+ const.effectEnergyTransfer: 'energyTransfer',
+ const.effectTargetMaxTargetRangeAndScanResolutionBonusAssistance: 'sensorBooster',
+ const.effectScanStrengthTargetPercentBonus: 'eccmProjector',
+ const.effectRemoteHullRepair: 'remoteHullRepair',
+ const.effectTargetArmorRepair: 'remoteArmorRepair',
+ const.effectShieldTransfer: 'shieldTransfer',
+ const.effectRemoteArmorRepairFalloff: 'remoteArmorRepair',
+ const.effectRemoteEnergyTransferFalloff: 'energyTransfer',
+ const.effectRemoteHullRepairFalloff: 'remoteHullRepair',
+ const.effectRemoteShieldTransferFalloff: 'shieldTransfer'}
+ALL_EWAR_TYPES = OFFENSIVE_EWAR_TYPES.copy()
+ALL_EWAR_TYPES.update(DEFENSIVE_EWAR_TYPES)

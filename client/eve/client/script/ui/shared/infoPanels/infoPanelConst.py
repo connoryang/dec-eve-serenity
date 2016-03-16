@@ -37,4 +37,5 @@ PANEL_DEFAULT_SETTINGS = {ViewState.Planet: [[PANEL_LOCATION_INFO, MODE_COMPACT]
                    [PANEL_MISSIONS, MODE_NORMAL],
                    [PANEL_FACTIONAL_WARFARE, MODE_NORMAL],
                    [PANEL_ACHIEVEMENTS, MODE_NORMAL]],
- ViewState.VirtualGoodsStore: []}
+ ViewState.VirtualGoodsStore: [],
+ ViewState.DockPanel: []}

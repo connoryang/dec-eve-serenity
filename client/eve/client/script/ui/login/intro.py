@@ -6,6 +6,7 @@ import blue
 import uicls
 import carbonui.const as uiconst
 import localization
+from carbonui.primitives.sprite import StreamingVideoSprite
 
 class Intro(uicls.LayerCore):
     __guid__ = 'form.Intro'
@@ -29,7 +30,7 @@ class Intro(uicls.LayerCore):
         self.sr.subtitleCont = None
         self.subtitles = None
         self.fadeTime = 125
-        self.moviePath = 'res:/video/origins_intro.bik'
+        self.moviePath = 'res:/video/origins_intro.webm'
         if blue.paths.FileExistsLocally(self.moviePath):
             self.InitMovie()
             self.InitSubtitles()
@@ -48,10 +49,15 @@ class Intro(uicls.LayerCore):
         self.sr.movieCont = uiprimitives.Container(parent=self, name='movieCont', idx=0, align=uiconst.TOALL, state=uiconst.UI_DISABLED)
         x, y, contWidth, contHeight = self.sr.movieCont.GetAbsolute()
         dimWidth, dimHeight = self.GetVideoDimensions(contWidth, contHeight, 1280, 720)
-        self.movie = uiprimitives.VideoSprite(parent=self.sr.movieCont, pos=(0,
+        audioTracks = {'EN': 0,
+         'DE': 1,
+         'FR': 2,
+         'RU': 3}
+        audioTrack = audioTracks.get(str(prefs.languageID), 0)
+        self.movie = StreamingVideoSprite(parent=self.sr.movieCont, pos=(0,
          0,
          dimWidth,
-         dimHeight), align=uiconst.CENTER, videoPath=self.moviePath, videoAutoPlay=False)
+         dimHeight), align=uiconst.CENTER, videoPath=self.moviePath, videoAutoPlay=False, audioTrack=audioTrack)
 
     def PlayMovie(self):
         self.movie.Play()
@@ -106,11 +112,7 @@ class Intro(uicls.LayerCore):
                  alpha), align=uiconst.TOALL, bold=False, state=uiconst.UI_DISABLED)
 
     def GetCurrentMovieTime(self):
-        currentFrame = self.movie.currentFrame
-        fps = self.movie.videoFps
-        if not fps:
-            return 0
-        return int(float(currentFrame) / float(fps) * 1000.0)
+        return self.movie.mediaTime / 1000000
 
     def WatchMovie(self):
         while not self.destroyed:

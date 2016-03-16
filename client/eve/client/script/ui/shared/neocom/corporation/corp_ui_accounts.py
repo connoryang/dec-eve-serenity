@@ -607,7 +607,6 @@ class CorpAccounts(uiprimitives.Container):
             left += c.width + 4
             self.sr.fltItemType = c = uicontrols.SinglelineEdit(name='flt_exacttype', parent=search_cont, label=localization.GetByLabel('UI/Corporations/Assets/ItemTypeExact'), setvalue=settings.user.ui.Get('corp_assets_filter_itemtype', ''), width=106, top=top, left=left, isTypeField=True)
             left += c.width + 4
-            c.OnFocusLost = self.ParseItemType
             self.sr.fltQuantity = c = uicontrols.SinglelineEdit(name='flt_quantity', parent=search_cont, label=localization.GetByLabel('UI/Corporations/Assets/MinQuantity'), setvalue=str(settings.user.ui.Get('corp_assets_filter_quantity', '')), width=60, top=top, left=left)
             left += c.width + 4
             c = self.sr.fltSearch = uicontrols.Button(parent=search_cont, label=localization.GetByLabel('UI/Common/Search'), func=self.Search, pos=(left,
@@ -618,6 +617,7 @@ class CorpAccounts(uiprimitives.Container):
             self.sr.search_inited = 1
         self.sr.search_cont.state = uiconst.UI_PICKCHILDREN
         self.sr.scroll.Load(fixedEntryHeight=42, contentList=[], sortby='label', headers=uix.GetInvItemDefaultHeaders()[:], noContentHint=localization.GetByLabel('UI/Corporations/Assets/NoItemsFound'))
+        self.Search()
 
     def ComboChange(self, wnd, *args):
         if wnd.name == 'flt_category':
@@ -665,6 +665,8 @@ class CorpAccounts(uiprimitives.Container):
                         itemTypeID = t.typeID
                         break
 
+                if not itemTypeID:
+                    itemTypeID = self.ParseItemType(self.sr.fltItemType)
             txt = self.sr.fltGroups.GetValue()
             txtc = self.sr.fltCategories.GetValue()
             if txt and int(txt) > 0:

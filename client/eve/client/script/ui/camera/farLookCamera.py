@@ -1,5 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\farLookCamera.py
+from eve.client.script.parklife import states
 from eve.client.script.ui.camera.baseSpaceCamera import BaseSpaceCamera
+from eve.client.script.ui.camera.cameraUtil import GetBallPosition, GetBall
 import evecamera
 import geo2
 
@@ -30,17 +32,18 @@ class FarLookCamera(BaseSpaceCamera):
             self._UpdateBobbingOffset()
         BaseSpaceCamera.OnActivated(self)
 
-    def LookingAt(self):
-        return self.GetBall(self.itemID)
+    def GetLookAtItemID(self):
+        return GetBall(self.itemID)
 
-    def LookAt(self, itemID = None):
-        ball = self.GetBall(itemID)
+    def LookAt(self, itemID = None, **kwargs):
+        ball = GetBall(itemID)
         if not ball:
             return
         if not self.CheckObjectTooFar(itemID):
             self.SwitchToLastCamera(itemID=itemID)
             return
-        ballPos = self.GetBallPosition(ball)
+        sm.StartService('state').SetState(itemID, states.lookingAt, True)
+        ballPos = GetBallPosition(ball)
         ballDir = geo2.Vec3Normalize(ballPos)
         atPosition = geo2.Vec3Add(self.eyePosition, geo2.Vec3Scale(ballDir, self.dist))
         self.TransitTo(atPosition, self.eyePosition, duration=1.0)
@@ -49,3 +52,9 @@ class FarLookCamera(BaseSpaceCamera):
         cameraID = self.lastCamera.cameraID
         itemID = itemID or self.lastLookAtID
         sm.GetService('sceneManager').SetActiveCameraByID(cameraID, itemID=itemID)
+
+    def GetLookAtItemID(self):
+        return self.itemID
+
+    def ResetCamera(self, *args):
+        self.SwitchToLastCamera()

@@ -4,6 +4,7 @@ import telemetry
 from carbonui.primitives.base import ScaleDpi, ReverseScaleDpi
 import trinity
 import mathUtil
+import service
 from carbonui.control.baselink import BaseLinkCoreOverride as BaseLink
 from carbonui.primitives.container import Container
 from carbonui.primitives.sprite import VisibleBase
@@ -780,7 +781,7 @@ class LabelCore(VisibleBase):
             elif type == 2:
                 tagStackDirty = self.tagIDToFunctionMapping[element[1]][1](self) or tagStackDirty
             elif type == 3:
-                if element[1] != 'loc':
+                if element[1] != 'loc' and session.role & service.ROLE_PROGRAMMER:
                     log.LogWarn('Unknown tag:', element[1])
             else:
                 log.LogError('Unknown element type ID in ProcessLineData', type)

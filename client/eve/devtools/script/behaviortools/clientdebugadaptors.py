@@ -1,9 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\devtools\script\behaviortools\clientdebugadaptors.py
 import logging
-from brennivin.messenger import Messenger
 import eve.common.script.net.eveMoniker as moniker
 from eve.devtools.script.behaviortools.debugwindow import BehaviorDebugWindow
 import uthread2
+import signals
 logger = logging.getLogger(__name__)
 EVENT_BEHAVIOR_DEBUG_UPDATE = 'OnBehaviorDebugUpdate'
 EVENT_BEHAVIOR_DEBUG_CONNECT_REQUEST = 'OnBehaviorDebugConnectRequest'
@@ -12,15 +12,14 @@ EVENT_BEHAVIOR_DEBUG_DISCONNECT_REQUEST = 'OnBehaviorDebugDisconnectRequest'
 class UpdateListener(object):
 
     def __init__(self):
-        self.messenger = Messenger()
+        self.messenger = signals.Messenger()
         self.behaviorDebuggersByEntryKey = {}
         sm.RegisterForNotifyEvent(self, EVENT_BEHAVIOR_DEBUG_UPDATE)
         sm.RegisterForNotifyEvent(self, EVENT_BEHAVIOR_DEBUG_CONNECT_REQUEST)
         sm.RegisterForNotifyEvent(self, EVENT_BEHAVIOR_DEBUG_DISCONNECT_REQUEST)
 
     def AddObserverForItemId(self, entryKey, handler):
-        if entryKey in self.messenger.signalsByMessageName:
-            self.messenger.signalsByMessageName[entryKey].clear()
+        self.messenger.UnsubscribeAllFromMessage(entryKey)
         self.messenger.SubscribeToMessage(entryKey, handler)
 
     def RemoveObserverForItemId(self, entryKey, handler):

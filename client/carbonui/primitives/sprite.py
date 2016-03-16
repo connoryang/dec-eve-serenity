@@ -1,11 +1,15 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\carbonui\primitives\sprite.py
 from .base import Base
 import carbonui.const as uiconst
+import audio2
+import blue
+import logging
 import remotefilecache
 import trinity
 import types
 import weakref
 import uthread
+import videoplayer
 try:
     import GameWorld
 except:
@@ -134,6 +138,8 @@ class TexturedBase(VisibleBase):
     default_noScale = 0
     default_texturePath = None
     default_textureSecondaryPath = None
+    default_translationPrimary = (0.0, 0.0)
+    default_translationSecodary = (0.0, 0.0)
     default_glowFactor = 0.0
     default_glowExpand = 0.0
     default_glowColor = (1, 1, 1, 1)
@@ -171,6 +177,8 @@ class TexturedBase(VisibleBase):
         rectHeight = attributes.rectHeight
         if rectHeight:
             self.rectHeight = rectHeight
+        self.translationPrimary = attributes.get('translationPrimary', self.default_translationPrimary)
+        self.translationSecondary = attributes.get('translationSecondary', self.default_translationSecodary)
         self.spriteEffect = attributes.get('spriteEffect', self.default_spriteEffect)
         self.rotation = attributes.get('rotation', self.default_rotation)
         self.tileX = attributes.get('tileX', self.default_tileX)
@@ -895,6 +903,256 @@ class VideoSprite(Sprite):
 
         self._isFetchingFile = True
         uthread.new(taskletfunc)
+
+
+class StreamingVideoSprite(Sprite):
+    __guid__ = 'uiprimitives.StreamingVideoSprite'
+    __renderObject__ = trinity.Tr2Sprite2d
+    __notifyevents__ = ['OnAudioActivated', 'OnAudioDeactivated']
+    default_videoPath = ''
+    default_videoLoop = False
+    default_videoAutoPlay = True
+    default_muteAudio = False
+    default_spriteEffect = trinity.TR2_SFX_NOALPHA
+
+    def Close(self, *args, **kwds):
+        self._DestroyVideo()
+        Sprite.Close(self, *args, **kwds)
+
+    def ApplyAttributes(self, attributes):
+        Sprite.ApplyAttributes(self, attributes)
+        sm.RegisterNotify(self)
+        self.renderJob = trinity.TriRenderJob()
+        self.textureRes = trinity.TriTextureRes()
+        self.texture = trinity.Tr2Sprite2dTexture()
+        self.player = None
+        self.path = None
+        self.audioTrack = 0
+        self._updateStep = None
+        self._isFetchingFile = False
+        RO = self.GetRenderObject()
+        self._positionComponent = attributes.get('positionComponent', None)
+        self.positionComponent = None
+        if 'videoPath' in attributes:
+            self.SetVideoPath(attributes['videoPath'], attributes.get('audioTrack', 0))
+        if 'pos' in attributes:
+            pos = attributes.get('pos', (self.default_left,
+             self.default_top,
+             self.default_width,
+             self.default_height))
+            RO.displayX, RO.displayY, RO.displayWidth, RO.displayHeight = pos
+
+    def OnVideoSizeAvailable(self, width, height):
+        pass
+
+    def OnVideoFinished(self):
+        pass
+
+    def _OnCreateTextures(self, player, ySize, uvSize):
+        try:
+            videoplayer.create_textures(player, ySize, uvSize)
+            rt = videoplayer.set_up_decode_render_job(player, self.renderJob)
+            self.textureRes.SetFromRenderTarget(rt)
+
+            def update_texture():
+                try:
+                    self.textureRes.SetFromRenderTarget(rt)
+                    if not self.texture.atlasTexture.isGood:
+                        self.texture.atlasTexture = trinity.Tr2AtlasTexture()
+                        self.texture.atlasTexture.textureRes = self.textureRes
+                except:
+                    logging.exception('Exception in VideoPlayer rj callback')
+
+            self.renderJob.steps.append(trinity.TriStepPythonCB(update_texture))
+            self.texture.atlasTexture = trinity.Tr2AtlasTexture()
+            self.texture.atlasTexture.textureRes = self.textureRes
+            trinity.renderJobs.recurring.append(self.renderJob)
+        except:
+            logging.exception('Exception in VideoPlayer.on_create_textures')
+
+    def _OnVideoStateChange(self, player):
+        try:
+            logging.info('Video player state changed to %s', videoplayer.State.GetNameFromValue(player.state))
+            if player.state == videoplayer.State.INITIAL_BUFFERING:
+                info = self.player.get_video_info()
+                self.OnVideoSizeAvailable(info['width'], info['height'])
+            elif player.state == videoplayer.State.DONE:
+                self.OnVideoFinished()
+        except:
+            logging.exception('Exception in VideoPlayer.on_state_change')
+
+    def _OnVideoError(self):
+        try:
+            self.player.validate()
+        except RuntimeError as e:
+            logging.exception('Video player error')
+
+    def _DestroyVideo(self):
+        try:
+            trinity.renderJobs.recurring.remove(self.renderJob)
+        except RuntimeError:
+            pass
+
+        if self.positionComponent:
+            self.positionComponent.UnRegisterPlacementObserverWrapper(self.positionObserver)
+            self.positionComponent = None
+            self.positionObserver = None
+        self.emitter = None
+        self.player = None
+        self._updateStep = None
+        self.renderJob = trinity.TriRenderJob()
+        self.textureRes = trinity.TriTextureRes()
+
+    def OnAudioActivated(self):
+        if self.path and not self._isFetchingFile:
+            self.SetVideoPath(self.path, self.audioTrack)
+
+    def OnAudioDeactivated(self):
+        if self.path and not self._isFetchingFile:
+            self.SetVideoPath(self.path, self.audioTrack)
+
+    def SetPositionComponent(self, positionComponent):
+        if self.emitter and positionComponent and GameWorld:
+            self.positionObserver = GameWorld.PlacementObserverWrapper(self.emitter)
+            positionComponent.RegisterPlacementObserverWrapper(self.positionObserver)
+            return positionComponent
+
+    def GetVideoSize(self):
+        try:
+            info = self.player.get_video_info()
+            return (info['width'], info['height'])
+        except (AttributeError, videoplayer.VideoPlayerError):
+            pass
+
+    def SetVideoPath(self, path, audioTrack = 0):
+        self._DestroyVideo()
+        self.path = path
+        self.audioTrack = audioTrack
+
+        def prefetch():
+            blue.paths.GetFileContentsWithYield(path)
+            if self._isFetchingFile and path == self.path:
+                self._isFetchingFile = False
+                self.SetVideoPath(path, audioTrack)
+
+        if path.lower().startswith('res:/'):
+            if blue.remoteFileCache.FileExists(path):
+                if not blue.paths.FileExistsLocally(path):
+                    self._isFetchingFile = True
+                    uthread.new(prefetch)
+                    return
+        self.emitter, outputChannel = uicore.audioHandler.GetAudioBus(is3D=self._positionComponent is not None, rate=48000)
+        self.positionComponent = self.SetPositionComponent(self._positionComponent)
+        if path.lower().startswith('res:/') or path.find(':') < 2:
+            stream = blue.paths.open(path)
+        else:
+            stream = blue.BlueNetworkStream(unicode(path).encode('utf-8'))
+        if uicore.audioHandler.active:
+            sink = videoplayer.Audio2Sink(audio2.GetDirectSoundPtr(), audio2.GetStreamPositionPtr(), outputChannel)
+        else:
+            sink = None
+        self.player = videoplayer.VideoPlayer(stream, sink, audioTrack)
+        self.player.on_state_change = self._OnVideoStateChange
+        self.player.on_create_textures = self._OnCreateTextures
+        self.player.on_error = self._OnVideoError
+
+    def Play(self):
+        if self.player:
+            self.player.resume()
+
+    def Pause(self):
+        if self.player:
+            self.player.pause()
+
+    def MuteAudio(self):
+        try:
+            self.player.audio_sink.volume = 0
+        except AttributeError:
+            pass
+
+    def UnmuteAudio(self):
+        try:
+            self.player.audio_sink.volume = 1
+        except AttributeError:
+            pass
+
+    def GetVolume(self):
+        try:
+            return self.player.audio_sink.volume
+        except AttributeError:
+            return 1
+
+    def SetVolume(self, volume):
+        try:
+            self.player.audio_sink.volume = volume
+        except AttributeError:
+            pass
+
+    @apply
+    def isMuted():
+        doc = 'Is audio stream muted for this video'
+
+        def fget(self):
+            try:
+                return self.player.audio_sink.volume == 0
+            except AttributeError:
+                return None
+
+        return property(**locals())
+
+    @apply
+    def isPaused():
+        doc = 'Is video paused'
+
+        def fget(self):
+            if self.player:
+                return self.player.is_paused
+
+        return property(**locals())
+
+    @apply
+    def isFinished():
+        doc = 'Has video finished playing'
+
+        def fget(self):
+            if self.destroyed:
+                return True
+            if self._isFetchingFile:
+                return False
+            if self.player:
+                return self.player.state == videoplayer.State.DONE
+
+        return property(**locals())
+
+    @apply
+    def mediaTime():
+        doc = 'Media playback time in nanoseconds'
+
+        def fget(self):
+            if self.player:
+                return self.player.media_time
+
+        return property(**locals())
+
+    @apply
+    def duration():
+        doc = 'Total video duration in nanoseconds'
+
+        def fget(self):
+            if self.player:
+                return self.player.duration
+
+        return property(**locals())
+
+    @apply
+    def downloadedTime():
+        doc = 'Media time downloaded from input stream in nanoseconds'
+
+        def fget(self):
+            if self.player:
+                return self.player.downloaded_media_time
+
+        return property(**locals())
 
 
 class PyColor(object):

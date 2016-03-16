@@ -209,7 +209,7 @@ from eve.common.script.util.eveCommonUtils import AUPerSecondToDestinyWarpSpeed
 from eve.common.script.util.eveCommonUtils import CombatLog_CopyText
 from eve.common.script.util.eveCommonUtils import GetPublicCrestUrl
 from eve.common.script.util.eveCommonUtils import Flatten
-from dogma.effects import GetEwarTypeByEffectID, ALLEWARTYPES, SERVEREWARTYPES
+from dogma.effects import GetEwarTypeByEffectID
 from eve.common.script.util.eveCommonUtils import GetKillMailInfo
 from eve.common.script.util.eveCommonUtils import IsDustEnabled
 from eve.common.script.util.eveCommonUtils import IsMemberlessLocal

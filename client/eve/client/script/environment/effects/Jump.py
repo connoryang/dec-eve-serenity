@@ -3,6 +3,7 @@ import random
 import blue
 import geo2
 from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive
+import evecamera
 import trinity
 import uthread
 import carbon.common.script.util.mathCommon as mathCommon
@@ -104,9 +105,13 @@ class JumpTransitionTunnel(object):
         self.effect = blue.resMan.LoadObject('res:/fisfx/jump/jumpgates/tunnel.red')
         self.effectRoot.children.append(self.effect)
         self._FindCurveSets(self.effect)
-        self.camera = self.GetCamera()
-        self.camera.useExtraTranslation = True
-        self.camera.extraTranslation = (0, 0, 0)
+        if IsNewCameraActive():
+            sceneMan = sm.GetService('sceneManager')
+            self.camera = sceneMan.SetActiveCameraByID(evecamera.CAM_JUMP)
+        else:
+            self.camera = self.GetCamera()
+            self.camera.useExtraTranslation = True
+            self.camera.extraTranslation = (0, 0, 0)
         transition = sm.GetService('viewState').GetTransitionByName('inflight', 'inflight')
         transition.SetTransitionEffect(self)
         self.transition = transition
@@ -128,7 +133,10 @@ class JumpTransitionTunnel(object):
         self.GetCamera().shakeController.DoCameraShake(self.shakeJumpInit)
 
     def GetCamera(self):
-        return sm.GetService('sceneManager').GetActiveSpaceCamera()
+        if IsNewCameraActive():
+            return sm.GetService('sceneManager')._GetOrCreateCamera(evecamera.CAM_JUMP)
+        else:
+            return sm.GetService('sceneManager').GetActiveSpaceCamera()
 
     def _PlayTunnelSequence(self):
         if self.ending:
@@ -143,7 +151,8 @@ class JumpTransitionTunnel(object):
         if self.startCS is not None:
             self.startCS.Play()
         offset = geo2.Vec3Scale(normDir, self.camOffsetStart)
-        camera.animationController.Schedule(transitioncam.OutExtraTransl(self.startCamDurationS, offset))
+        if not IsNewCameraActive():
+            camera.animationController.Schedule(transitioncam.OutExtraTransl(self.startCamDurationS, offset))
         camera.animationController.Schedule(transitioncam.OutFOV(self.startCamDurationS))
         blue.synchro.SleepSim(500)
 
@@ -167,13 +176,18 @@ class JumpTransitionTunnel(object):
         self.ending = True
         if self.cameraLookAnimation is not None:
             self.cameraLookAnimation.Stop()
+        camera = self.GetCamera()
+        camera.shakeController.EndCameraShake('JumpIn')
+        if IsNewCameraActive():
+            sm.GetService('sceneManager').ActivatePrimarySpaceCam()
         with ExceptionEater('JumpTransitionTunnelEnd'):
             if not self.destinationSceneApplied:
                 self.transition.ApplyDestinationScene()
             camera = self.GetCamera()
             anim = camera.animationController
             offset = geo2.Vec3Scale(self.normDir, -self.camOffsetEnd)
-            anim.Schedule(transitioncam.InExtraTransl(self.endCamDurationS, offset))
+            if not IsNewCameraActive():
+                anim.Schedule(transitioncam.InExtraTransl(self.endCamDurationS, offset))
             anim.Schedule(transitioncam.InFOV(self.endCamDurationS))
             camera.shakeController.DoCameraShake(self.shakeJumpIn)
         if self.startCS is not None:
@@ -185,6 +199,8 @@ class JumpTransitionTunnel(object):
         self.FadeUIIn()
         uthread.new(self.BlinkSystemName)
         uthread.new(self._DelayedCleanup)
+        if IsNewCameraActive():
+            self.cameraLookAnimation.OnJumpDone()
 
     def _DelayedCleanup(self):
         blue.synchro.SleepSim(2000)
@@ -194,8 +210,6 @@ class JumpTransitionTunnel(object):
             self.scene.warpTunnel = None
         self.effect = None
         self.effectRoot = None
-        camera = self.GetCamera()
-        camera.shakeController.EndCameraShake('JumpIn')
 
     def DoCameraLookAnimation(self):
         if self.cameraLookAnimation is not None:
@@ -208,7 +222,7 @@ class JumpTransitionTunnel(object):
         uicore.animations.FadeOut(panel.headerLabel, loops=4, duration=0.5, curveType=uiconst.ANIM_WAVE)
 
     def GetUIToFade(self):
-        toFade = [uicore.layer.bracket]
+        toFade = []
         from eve.client.script.ui.inflight.overview import OverView
         overview = OverView.GetIfOpen()
         if overview is not None:
@@ -223,22 +237,24 @@ class JumpTransitionTunnel(object):
         if self.ending:
             self.fxSequencer.LogWarn('Jump Transition: Trying to fade out ui while ending.')
             return
+        uicore.animations.FadeOut(uicore.layer.bracket, duration=1)
         objs = self.GetUIToFade()
         for obj in objs:
-            uicore.animations.FadeOut(obj, duration=1)
+            uicore.animations.FadeOut(obj, duration=1, sleep=True)
 
-        blue.synchro.SleepSim(1000)
+        uicore.layer.bracket.opacity = 0.0
         if not self.ending:
             for obj in objs:
                 obj.display = False
 
     def FadeUIIn(self):
+        uicore.animations.FadeIn(uicore.layer.bracket, duration=1)
         objs = self.GetUIToFade()
         for obj in objs:
             obj.display = True
-            uicore.animations.FadeIn(obj, duration=1)
+            uicore.animations.FadeIn(obj, duration=1, sleep=True)
 
-        blue.synchro.SleepSim(1000)
+        uicore.layer.bracket.opacity = 1.0
         for obj in objs:
             obj.opacity = 1.0
             obj.display = True
@@ -304,6 +320,7 @@ class JumpTransitionWormhole(object):
         self.translationFromParent = None
         self.mainSequenceFinished = False
         self.translationFromWormhole = 6000.0
+        self.activeCameraID = None
 
     def SetScene(self, scene):
         if self.model is None:
@@ -336,6 +353,10 @@ class JumpTransitionWormhole(object):
 
         transition.SetTransitionEffect(self)
         self.itemID = wormholeItem.itemID
+        if IsNewCameraActive():
+            sceneMan = sm.GetService('sceneManager')
+            self.activeCameraID = sceneMan.GetActiveSpaceCamera().cameraID
+            self.camera = sceneMan.SetActiveCameraByID(evecamera.CAM_JUMP)
 
     def _PlayMidCurves(self):
         blue.synchro.Sleep(500)
@@ -353,7 +374,7 @@ class JumpTransitionWormhole(object):
     def Start(self):
         camera = self.GetCamera()
         if IsNewCameraActive():
-            self.translationFromParent = geo2.Vec3Subtract(camera.eyePosition, camera.atPosition)
+            self.translationFromParent = camera.GetZoomDistance()
         else:
             self.translationFromParent = camera.translationFromParent
         camera.LookAt(self.itemID)
@@ -382,10 +403,14 @@ class JumpTransitionWormhole(object):
             self.startCS.Stop()
         if self.stopCS is not None:
             self.stopCS.Play()
-        blue.synchro.SleepSim(500)
-        camera = self.GetCamera()
-        camera.TranslateFromParentAccelerated(self.translationFromWormhole, self.translationFromParent, 0.75, 4.0)
-        blue.synchro.SleepSim(1500)
+        if IsNewCameraActive():
+            sm.GetService('sceneManager').SetActiveCameraByID(self.activeCameraID)
+            blue.synchro.SleepSim(2000)
+        else:
+            blue.synchro.SleepSim(500)
+            camera = self.GetCamera()
+            camera.TranslateFromParentAccelerated(self.translationFromWormhole, self.translationFromParent, 0.75, 4.0)
+            blue.synchro.SleepSim(1500)
         if self.scene is not None:
             self.scene.objects.fremove(self.model)
             self.scene = None

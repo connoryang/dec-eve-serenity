@@ -9,8 +9,95 @@ import util
 import urllib
 from eve.client.script.ui.control.entries import Generic as GenericListEntry, Get as GetListEntry
 import carbonui.const as uiconst
+from carbonui.control.scrollentries import SE_BaseClassCore
+from carbonui.primitives.containerAutoSize import ContainerAutoSize
+from eve.client.script.ui.control.eveLabel import Label, EveLabelMedium, EveLabelMediumBold, EveLabelLargeBold
+from eve.client.script.ui.control.buttons import ButtonIcon
+from eve.client.script.ui.shared.videowindow import VideoPlayerWindow
+import eve.client.script.ui.control.entries as listentry
 import localization
 import uthread
+import utillib
+from videoplayer.index import VideoIndex
+import unicodedata
+if boot.region == 'optic':
+    TUTORIAL_VIDEOS_INDEX = VideoIndex('http://cdnpatcheve.tiancity.cn/video/flightacademy/index.json')
+else:
+    TUTORIAL_VIDEOS_INDEX = VideoIndex('http://cdn1.eveonline.com/academy/index.json')
+
+class _TutorialVideoItem(SE_BaseClassCore):
+    __guid__ = 'listentry.TutorialVideoItem'
+    __params__ = ['label']
+    isDragObject = True
+
+    def Startup(self, *etc):
+        _textCont = ContainerAutoSize(parent=self, align=uiconst.TOALL, padLeft=20, padTop=4, clipChildren=True)
+        self.label = EveLabelMediumBold(text='', parent=_textCont, align=uiconst.TOTOP, state=uiconst.UI_NORMAL, padRight=40)
+        self.text = EveLabelMedium(text='', parent=_textCont, align=uiconst.TOTOP, padRight=40)
+        self.infoicon = ButtonIcon(left=2, parent=self, idx=0, iconSize=32, align=uiconst.CENTERRIGHT)
+        self.infoicon.SetTexturePath('res:/ui/texture/icons/bigplay.png')
+
+    def Load(self, node):
+
+        def play():
+            HelpWindow.PlayVideo(node)
+
+        self.node = node
+        self.label.text = self.node.title
+        self.infoicon.node = node
+        self.text.text = node.description
+        self.label.OnClick = play
+        self.infoicon.func = play
+
+    def _Click(self):
+        HelpWindow.PlayVideo(self.node)
+
+    def GetDragData(self, *args):
+        return (self.node,)
+
+    def GetDynamicHeight(node, width):
+        return max(32, EveLabelMedium.MeasureTextSize(node.description, width=width - 60)[1] + EveLabelMediumBold.MeasureTextSize(node.title, width=width - 60)[1] + 8)
+
+
+class _RelatedItem(uiprimitives.Container):
+
+    def ApplyAttributes(self, attributes):
+
+        def play():
+            HelpWindow.PlayVideoId(attributes['videoid'])
+
+        uiprimitives.Container.ApplyAttributes(self, attributes)
+        textCont = ContainerAutoSize(parent=self, align=uiconst.TOALL, padLeft=40, clipChildren=True)
+        self.label = EveLabelLargeBold(parent=textCont, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
+        self.label.OnClick = play
+        self.text = EveLabelMediumBold(parent=textCont, align=uiconst.TOTOP)
+        playicon = ButtonIcon(parent=self, idx=0, iconSize=32, align=uiconst.CENTERLEFT, func=play)
+        playicon.SetTexturePath('res:/ui/texture/icons/bigplay.png')
+        self.label.text = attributes.get('title', '')
+        self.text.text = attributes.get('description', '')
+
+    def SetSizeAutomatically(self):
+        width = self.displayRect[2]
+        height = EveLabelMediumBold.MeasureTextSize(self.text.text, width=width - 40)[1] + EveLabelLargeBold.MeasureTextSize(self.label.text, width=width - 40)[1]
+        self.height = height
+
+    def UpdateAlignment(self, *args, **kwds):
+        budget = uiprimitives.Container.UpdateAlignment(self, *args, **kwds)
+        self.SetSizeAutomatically()
+        return budget
+
+    def GetAbsoluteSize(self):
+        self.SetSizeAutomatically()
+        return uiprimitives.Container.GetAbsoluteSize(self)
+
+
+class _RelatedContainer(uiprimitives.Container):
+
+    def _OnResize(self, *args):
+        width = self.displayRect[2]
+        for each in self.children:
+            each.width = width
+
 
 class HelpWindow(uicontrols.Window):
     __guid__ = 'form.HelpWindow'
@@ -33,7 +120,9 @@ class HelpWindow(uicontrols.Window):
         self.MouseDown = self.OnWndMouseDown
         self.supportLoaded = False
         self.tutorialsLoaded = False
+        self.tutorialVideosLoaded = False
         supportPar = uiprimitives.Container(name='supportPar', parent=self.sr.main, left=const.defaultPadding, top=const.defaultPadding, width=const.defaultPadding, height=const.defaultPadding)
+        videoPar = uiprimitives.Container(name='videoPar', parent=self.sr.main, left=const.defaultPadding, top=const.defaultPadding, width=const.defaultPadding, height=const.defaultPadding)
         tabs = []
         if sm.GetService('experimentClientSvc').IsTutorialEnabled():
             tutorialsPar = uiprimitives.Container(name='tutorialPar', parent=self.sr.main, pos=(0, 0, 0, 0))
@@ -43,13 +132,18 @@ class HelpWindow(uicontrols.Window):
               ('support',)], [localization.GetByLabel('UI/Help/Tutorials'),
               tutorialsPar,
               self,
-              ('tutorials',)]]
+              ('tutorials',)], [localization.GetByLabel('UI/Help/TutorialVideos'),
+              videoPar,
+              self,
+              ('videos',)]]
         else:
             tabs = [[localization.GetByLabel('UI/Help/Support'),
               supportPar,
               self,
-              ('support',)]]
-            attributes.showPanel = None
+              ('support',)], [localization.GetByLabel('UI/Help/TutorialVideos'),
+              videoPar,
+              self,
+              ('videos',)]]
         tabs = uicontrols.TabGroup(name='tabparent', parent=self.sr.main, idx=0, tabs=tabs, autoselecttab=0)
         tabs.ShowPanelByName(attributes.showPanel or localization.GetByLabel('UI/Help/Support'))
         self.sr.mainTabs = tabs
@@ -66,6 +160,8 @@ class HelpWindow(uicontrols.Window):
                 self.LoadTutorials(panel)
             elif key == 'support':
                 self.LoadSupport(panel)
+            elif key == 'videos':
+                self.LoadTutorialVideos(panel)
 
     def LoadTutorials(self, panel, *args):
         if self.tutorialsLoaded:
@@ -113,6 +209,61 @@ class HelpWindow(uicontrols.Window):
         self.sr.tutorialBtns = btns
         self.sr.tutorialScroll = scroll
         self.tutorialsLoaded = True
+
+    def LoadTutorialVideos(self, panel, *args):
+        if self.tutorialVideosLoaded:
+            return
+
+        def GetSubContent(group):
+            scrolllist = []
+            for each in TUTORIAL_VIDEOS_INDEX.get_videos_in_group(group.index):
+                scrolllist.append(listentry.Get(data=each, decoClass=_TutorialVideoItem))
+
+            return scrolllist
+
+        scrolllist = []
+        for index, each in TUTORIAL_VIDEOS_INDEX.get_groups():
+            data = {'GetSubContent': GetSubContent,
+             'BlockOpenWindow': True,
+             'label': each,
+             'showicon': 'hide',
+             'showlen': 0,
+             'index': index,
+             'state': 'locked',
+             'id': 'tutorialvideocat_%s' % index}
+            scrolllist.append(listentry.Get('Group', data))
+
+        scroll = uicontrols.Scroll(parent=panel, align=uiconst.TOALL)
+        scroll.LoadContent(contentList=scrolllist)
+        self.tutorialVideosLoaded = True
+
+    @classmethod
+    def PlayVideoId(cls, videoid):
+        desc = TUTORIAL_VIDEOS_INDEX.get_video_by_id(videoid)
+        if desc:
+            cls.PlayVideo(utillib.KeyVal(desc))
+
+    @classmethod
+    def PlayVideo(cls, node):
+
+        def showRelated(parent):
+            moreContainer = uiprimitives.Container(parent=parent, align=uiconst.TOBOTTOM, height=50)
+            more = EveLabelMediumBold(text=localization.GetByLabel('UI/Help/ShowMoreTutorials'), parent=moreContainer, align=uiconst.CENTER, state=uiconst.UI_NORMAL)
+            more.OnClick = lambda : HelpWindow.Open(showPanel=localization.GetByLabel('UI/Help/TutorialVideos'))
+            relatedParent = _RelatedContainer(parent=parent, align=uiconst.TOALL, padding=(100, 40, 100, 40))
+            relatedContainer = ContainerAutoSize(parent=relatedParent, align=uiconst.CENTER)
+            for each in TUTORIAL_VIDEOS_INDEX.get_related(node.id):
+                _RelatedItem(align=uiconst.TOTOP, parent=relatedContainer, title=each['fullTitle'], description=each['description'], videoid=each['id'])
+
+        VideoPlayerWindow.Open(windowID='VideoPlayer').PlayVideo(node.url, title=node.fullTitle, subtitles=node.subtitles, onFinish=showRelated)
+        cls.LogPlayVideo(node.id)
+
+    @classmethod
+    def LogPlayVideo(cls, videoIdUnicode):
+        videoIdString = unicodedata.normalize('NFKD', videoIdUnicode).encode('ascii', 'ignore')
+        videoId = videoIdString.rsplit('_')[0]
+        languageId = localization.util.GetLanguageID()
+        sm.GetService('infoGatheringSvc').LogInfoEvent(eventTypeID=const.infoEventVideoPlayed, itemID=session.charid, itemID2=session.userid, int_1=videoId, char_1=languageId)
 
     def CloseTutorialService(self):
         sm.StopService('tutorial')
@@ -223,21 +374,6 @@ class HelpWindow(uicontrols.Window):
                 petbtnparent.height += hdbtn.height + 4
         return petpar.height + petbtnparent.height + 8
 
-    def _LoadSupportKnowledgebase(self, parent):
-        kbpar = uiprimitives.Container(name='kbpar', parent=parent, align=uiconst.TOTOP)
-        kbpar.padTop = 4
-        kbtext = uicontrols.EveLabelMedium(name='label', text=localization.GetByLabel('UI/Help/EvelopediaHintText'), parent=kbpar, align=uiconst.TOPLEFT, pos=(8, 0, 280, 0), state=uiconst.UI_NORMAL)
-        kbpar.height = kbtext.textheight + 4
-        kbbtnparent = uiprimitives.Container(name='kbbtnparent', parent=parent, align=uiconst.TOTOP, width=96)
-        kbbtnparent.padTop = 4
-        kbbtn = uicontrols.Button(parent=kbbtnparent, label=localization.GetByLabel('UI/Help/SearchEvelopedia'), func=self.SearchKB, pos=(6, 0, 0, 0), align=uiconst.TOPRIGHT, btn_default=1)
-        self.sr.kbsearch = uicontrols.SinglelineEdit(name='kbsearch', parent=kbbtnparent, pos=(kbbtn.width + 14,
-         0,
-         195,
-         0), align=uiconst.TOPRIGHT)
-        kbbtnparent.height = max(kbbtn.height, self.sr.kbsearch.height) + 4
-        return kbpar.height + kbbtnparent.height + 8
-
     def _LoadSupportCareer(self, parent):
         funnelpar = uiprimitives.Container(name='funnelpar', parent=parent, align=uiconst.TOTOP)
         funnelpar.padTop = 4
@@ -269,15 +405,12 @@ class HelpWindow(uicontrols.Window):
         LineThemeColored(parent=subpar, align=uiconst.TOTOP)
         sumHeight += self._LoadSupportPetitions(subpar) + 1
         LineThemeColored(parent=subpar, align=uiconst.TOTOP)
-        sumHeight += self._LoadSupportKnowledgebase(subpar) + 1
-        LineThemeColored(parent=subpar, align=uiconst.TOTOP)
         sumHeight += self._LoadSupportCareer(subpar) + 1
         if int(sm.GetService('machoNet').GetGlobalConfig().get('bugReporting_ShowButton', 0)) > 0:
             LineThemeColored(parent=subpar, align=uiconst.TOTOP)
             sumHeight += self._LoadSupportBugReport(subpar) + 1
         self.SetMinSize([self.minsize[0], self.sr.topParent.height + self.sr.headerParent.height + sumHeight + 32])
         BumpedUnderlay(bgParent=panel)
-        uicore.registry.SetFocus(self.sr.kbsearch)
         self.supportLoaded = True
 
     def OpenHelpCenter(self, *args):
@@ -285,18 +418,6 @@ class HelpWindow(uicontrols.Window):
         if eve.Message('HelpCenterOpenWarning', {}, uiconst.OKCANCEL) == uiconst.ID_OK:
             petitioner = sm.RemoteSvc('petitioner')
             webbrowser.open_new(petitioner.GetZendeskJwtLink())
-
-    def SearchKB(self, *args):
-        search = self.sr.kbsearch.GetValue()
-        if search:
-            url = 'http://wiki.eveonline.com/en/wiki/Special:Search'
-            data = [('search', search), ('go', 'Go')]
-            self.LogHelpWindowEvents('searchEvlopedia', '')
-            uicore.cmd.OpenBrowser('%s?%s' % (url, urllib.urlencode(data)))
-
-    def Confirm(self, *args):
-        if uicore.registry.GetFocus() == self.sr.kbsearch:
-            self.SearchKB()
 
     def FilePetition(self, *args):
         sm.GetService('petition').NewPetition()

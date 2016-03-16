@@ -1,5 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\notifications\client\development\skillHistoryRow.py
-import characterskills.util as charutils
+import characterskills as charskills
 import evetypes
 __author__ = 'aevar'
 
@@ -18,7 +18,7 @@ class SkillHistoryRow(object):
 
     def initLevels(self, skillTimeConstant):
         self.skillTimeConstant = skillTimeConstant
-        self.levels = charutils.GetSPForAllLevels(skillTimeConstant)
+        self.levels = charskills.GetSPForAllLevels(skillTimeConstant)
         self._calcCurrentLevel()
 
     def _calcCurrentLevel(self):

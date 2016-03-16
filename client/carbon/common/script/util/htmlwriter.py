@@ -3429,7 +3429,7 @@ class HtmlWriterEx(HtmlWriter):
 class Form():
     __guid__ = 'htmlwriter.Form'
 
-    def __init__(self, url = '', action = '', method = 'GET', target = '', formName = 'NeedAName', encType = '', request = None, waitingMessage = None):
+    def __init__(self, url = '', action = '', method = 'GET', target = '', formName = 'NeedAName', encType = '', request = None, waitingMessage = None, **kwargs):
         self.url = url
         self.formName = formName
         self.action = action
@@ -3439,6 +3439,7 @@ class Form():
         self.encType = encType
         self.request = request
         self.waitingMessage = waitingMessage
+        self.extraAttributes = kwargs
 
     def AddLocalizationInput(self, ctrlID, value, messageID, width, labelCaption = None):
         self.elements.append([ctrlID if labelCaption is None else labelCaption, GetLocalizationInput(ctrlID, value, messageID, width), ''])
@@ -3817,33 +3818,48 @@ class Form():
         encType = ''
         if self.encType != '':
             encType = 'enctype="%s"' % self.encType
+        extra = []
+        if self.extraAttributes and isinstance(self.extraAttributes, dict):
+            for k, v in self.extraAttributes.iteritems():
+                extra.append('%s="%s"' % (k, v))
+
+        if extra:
+            extra = ' %s' % ' '.join(extra)
+        else:
+            extra = ''
         if not (self.url or self.action):
-            self.s.Write('<form name="%s" method="%s" %s>\n' % (self.formName, self.method, target))
+            self.s.Write('<form name="%s" method="%s" %s%s>\n' % (self.formName,
+             self.method,
+             target,
+             extra))
         elif not self.action:
-            self.s.Write('<form name="%s" id="%s" action="%s" method="%s" %s %s>\n' % (self.formName,
+            self.s.Write('<form name="%s" id="%s" action="%s" method="%s" %s %s%s>\n' % (self.formName,
              self.formName,
              self.url,
              self.method,
              target,
-             encType))
+             encType,
+             extra))
         else:
             stuff = self.url.split('#')
             if len(stuff) > 1:
-                self.s.Write('<form name="%s" id="%s" action="%s?action=%s" method="%s" %s %s>\n' % (self.formName,
+                self.s.Write('<form name="%s" id="%s" action="%s?action=%s" method="%s" %s %s%s>\n' % (self.formName,
                  self.formName,
                  stuff[0],
                  self.action + '#' + stuff[1],
                  self.method,
                  target,
-                 encType))
+                 encType,
+                 extra))
             else:
-                self.s.Write('<form name="%s" id="%s" action="%s?action=%s" method="%s" %s %s>\n' % (self.formName,
+                self.s.Write('<form name="%s" id="%s" action="%s?action=%s" method="%s" %s %s%s>\n' % (self.formName,
                  self.formName,
                  self.url,
                  self.action,
                  self.method,
                  target,
-                 encType))
+                 encType,
+                 extra))
         if self.waitingMessage is not None:
             self.s.Write(WaitingMessage(self.waitingMessage))
         if style != 2:

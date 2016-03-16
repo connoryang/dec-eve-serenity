@@ -87,7 +87,7 @@ class SpaceCamera(CameraBase):
 
     def DoBallRemove(self, ball, slimItem, terminal):
         if session.shipid is not None:
-            lookingAtID = self.LookingAt()
+            lookingAtID = self.GetLookAtItemID()
             if lookingAtID is not None and ball.id == lookingAtID:
                 if ball.explodeOnRemove and ball.id != session.shipid:
                     uthread.new(self._HandleTargetKilled, ball)
@@ -102,17 +102,17 @@ class SpaceCamera(CameraBase):
     def _HandleTargetKilled(self, ball):
         delay = ball.GetExplosionLookAtDelay()
         blue.synchro.SleepSim(delay)
-        lookingAtID = self.LookingAt()
+        lookingAtID = self.GetLookAtItemID()
         if lookingAtID == ball.id:
             self.LookAt(session.shipid)
         if self.cameraInterestID == ball.id:
-            self.SetCameraInterest(None)
+            self.Track(None)
 
     def _AdjustLookAtTarget(self, ball):
         if session.shipid is None:
             return
         cameraParent = self.GetCameraParent()
-        lookingAtID = self.LookingAt()
+        lookingAtID = self.GetLookAtItemID()
         if cameraParent and cameraParent.parent and cameraParent.parent == ball.model:
             cameraParent.parent = None
         if lookingAtID and ball.id == lookingAtID and lookingAtID != session.shipid:
@@ -121,7 +121,7 @@ class SpaceCamera(CameraBase):
     def OnSpecialFX(self, shipID, moduleID, moduleTypeID, targetID, otherTypeID, guid, isOffensive, start, active, duration = -1, repeat = None, startTime = None, timeFromStart = 0, graphicInfo = None):
         if guid == 'effects.Warping':
             if shipID == session.shipid:
-                if self.LookingAt() is not None and self.LookingAt() != session.shipid:
+                if self.GetLookAtItemID() is not None and self.GetLookAtItemID() != session.shipid:
                     self.LookAt(session.shipid)
 
     def OnSetDevice(self, *args):
@@ -156,7 +156,7 @@ class SpaceCamera(CameraBase):
             return tracker
         return item
 
-    def SetCameraInterest(self, itemID):
+    def Track(self, itemID):
         self.cameraInterestID = itemID
         cameraInterest = self.GetCameraInterest()
         if itemID is None:
@@ -164,7 +164,7 @@ class SpaceCamera(CameraBase):
         trackable = self._GetTrackableCurve(itemID)
         cameraInterest.translationCurve = trackable
 
-    def GetCameraInterestID(self):
+    def GetTrackItemID(self):
         return self.cameraInterestID
 
     def _AbortLookAtOther(self):
@@ -211,7 +211,7 @@ class SpaceCamera(CameraBase):
                 while item.loadingModel:
                     blue.synchro.Yield()
 
-    def LookAt(self, itemID, setZ = None, resetCamera = False, smooth = True):
+    def LookAt(self, itemID, setZ = None, resetCamera = False, smooth = True, **kwargs):
         item = sm.StartService('michelle').GetBall(itemID)
         if not hasattr(item, 'GetModel') or item.GetModel() is None:
             return
@@ -257,7 +257,7 @@ class SpaceCamera(CameraBase):
         self.PanCamera(beg, end, time, cache)
 
     def PanCamera(self, cambeg = None, camend = None, time = 0.5, cache = False, source = None):
-        cacheTranslation = cache and self.LookingAt() == session.shipid
+        cacheTranslation = cache and self.GetLookAtItemID() == session.shipid
         self.animationController.Schedule(camutils.PanCamera(cambeg, camend, time, cacheTranslation, source))
 
     def TranslateFromParentAccelerated(self, begin, end, durationSec, accelerationPower = 2.0):
@@ -288,7 +288,7 @@ class SpaceCamera(CameraBase):
         sm.ScatterEvent('OnLookAtMyShip', session.shipid)
         self.LookAt(session.shipid, resetCamera=True)
 
-    def LookingAt(self):
+    def GetLookAtItemID(self):
         return self.lookingAt
 
     def _GetTranslationFromParentForItem(self, itemID):
@@ -319,7 +319,7 @@ class SpaceCamera(CameraBase):
         return retval
 
     def _GetMinMaxTranslationFromParent(self):
-        lookingAt = self.LookingAt() or session.shipid
+        lookingAt = self.GetLookAtItemID() or session.shipid
         mn = self._GetTranslationFromParentForItem(lookingAt)
         mx = TRANSLATION_MAX
         return (mn, mx)

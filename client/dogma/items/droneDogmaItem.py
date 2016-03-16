@@ -41,7 +41,6 @@ class DroneDogmaItem(BaseDogmaItem):
                 shipItem.subItems.add(self)
         self.dogmaLocation.broker.LogInfo('DroneDogmaItem %s handling locationChange from %s to new location %s' % (self.itemID, oldLocationID, self.locationID))
         self.__RemoveAndRestoreDroneOwnerModifiers(oldLocationID)
-        super(BaseDogmaItem, self).HandleLocationChange(oldLocationID)
 
     @TimedFunction('DroneDogmaItem::__RemoveAndRestoreDroneOwnerModifiers')
     def __RemoveAndRestoreDroneOwnerModifiers(self, oldLocationID):
@@ -96,6 +95,9 @@ class DroneDogmaItem(BaseDogmaItem):
         if self.itemID not in pilotShip.GetDrones():
             return False
         return True
+
+    def GetLocation(self):
+        return None
 
     def ReconnectWithOwner(self, ownerID, shipID):
         self.RemoveDroneOwnerModifiers(ownerID)

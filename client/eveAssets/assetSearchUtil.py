@@ -5,8 +5,22 @@ import dogma.const as dogmaConst
 import eve.common.lib.appConst as appConst
 import evetypes
 import inventorycommon.const as invConst
-REGEX = re.compile("\n    \\b(?P<key>\\w+):\\s*          # a single keyword followed by a : like 'min:'\n    (?P<value>[\\w\\s]+)          # the value can be any combination of whitespaces and alphanumerical letters\n    (?![\\w+:])                  # we dont want to include a word that is followed by : since it will mark a new keyword\n    ", re.UNICODE + re.IGNORECASE + re.VERBOSE)
+REGEX = re.compile("\n    \\b(?P<key>\\w+):\\s*                          # key = a single keyword followed by a : like 'min:'\n    (?P<value>[-+]?\\d+\\.\\d+|[-+]?\\d+|[\\w\\s]+)   # value = decimal number, an integer or any combination of whitespaces and alphanumerical letters\n    (?![\\w+:])                                  # we don't want to include a word that is followed by : since it will mark a new keyword\n    ", re.UNICODE + re.IGNORECASE + re.VERBOSE)
 KeywordOption = namedtuple('KeywordOption', 'keyword optionDescription specialOptions matchFunction')
+
+def IsPartOfText(text, value):
+    try:
+        return text.lower().startswith(value.lower())
+    except AttributeError:
+        return False
+
+
+def IsTextMatch(text, value):
+    try:
+        return text.lower() == value.lower()
+    except AttributeError:
+        return False
+
 
 def ParseString(text):
     matches = REGEX.findall(text)
@@ -105,25 +119,40 @@ class AssetKeywordSearch(object):
         conditions.append(CheckCategory)
 
     def MatchMinimumQuantity(self, conditions, value):
-        quantity = int(value)
+        try:
+            quantity = int(value)
+        except ValueError:
+            quantity = None
 
         def CheckMinQuantity(item):
+            if not quantity:
+                return value == ''
             return item.stacksize >= quantity
 
         conditions.append(CheckMinQuantity)
 
     def MatchMaximumQuantity(self, conditions, value):
-        quantity = int(value)
+        try:
+            quantity = int(value)
+        except ValueError:
+            quantity = None
 
         def CheckMaxQuantity(item):
+            if not quantity:
+                return value == ''
             return item.stacksize <= quantity
 
         conditions.append(CheckMaxQuantity)
 
     def MatchMetalevel(self, conditions, value):
-        level = int(value)
+        try:
+            level = int(value)
+        except ValueError:
+            level = None
 
         def CheckMetaLevel(item):
+            if not level:
+                return value == ''
             metaLevel = self.GetMetaLevel(item.typeID)
             return level == metaLevel
 
@@ -147,18 +176,28 @@ class AssetKeywordSearch(object):
         conditions.append(CheckMetaGroup)
 
     def MatchTechlevel(self, conditions, value):
-        level = int(value)
+        try:
+            level = int(value)
+        except ValueError:
+            level = None
 
         def CheckTechLevel(item):
+            if not level:
+                return value == ''
             techLevel = self.GetTechLevel(item.typeID)
             return level == techLevel
 
         conditions.append(CheckTechLevel)
 
     def MatchMinSecurity(self, conditions, value):
-        secLevel = float(value)
+        try:
+            secLevel = float(value)
+        except ValueError:
+            secLevel = None
 
         def CheckMinSecurity(item):
+            if not secLevel:
+                return value == ''
             try:
                 return self.matchedResultsMinSecurityByStationID[item.stationID]
             except KeyError:
@@ -170,9 +209,14 @@ class AssetKeywordSearch(object):
         conditions.append(CheckMinSecurity)
 
     def MatchMaxSecurity(self, conditions, value):
-        secLevel = float(value)
+        try:
+            secLevel = float(value)
+        except ValueError:
+            secLevel = None
 
         def CheckMaxSecurity(item):
+            if not secLevel:
+                return value == ''
             try:
                 return self.matchedResultsMaxSecurityByStationID[item.stationID]
             except KeyError:
@@ -184,18 +228,20 @@ class AssetKeywordSearch(object):
         conditions.append(CheckMaxSecurity)
 
     def MatchSecurityClass(self, conditions, value):
-        if self.highSecurityText.startswith(value):
+        if IsPartOfText(self.highSecurityText, value):
             secClass = [appConst.securityClassHighSec]
-        elif self.lowSecurityText.startswith(value):
+        elif IsPartOfText(self.lowSecurityText, value):
             secClass = [appConst.securityClassLowSec]
-        elif self.nullSecurityText.startswith(value) or self.zeroSecurityText.startswith(value):
+        elif IsPartOfText(self.nullSecurityText, value) or IsPartOfText(self.zeroSecurityText, value):
             secClass = [appConst.securityClassZeroSec]
-        elif self.empireSecurityText.startswith(value):
+        elif IsPartOfText(self.empireSecurityText, value):
             secClass = [appConst.securityClassHighSec, appConst.securityClassLowSec]
         else:
-            return
+            secClass = None
 
         def CheckSecurityClass(item):
+            if not secClass:
+                return value == ''
             try:
                 return self.matchedSecurityClassByStationID[item.stationID]
             except KeyError:
@@ -263,14 +309,18 @@ class AssetKeywordSearch(object):
         conditions.append(CheckStation)
 
     def MatchBlueprint(self, conditions, value):
-        if self.blueprintCopyText.startswith(value):
+        if IsPartOfText(self.blueprintCopyText, value):
             isBpo = False
-        elif self.blueprintOriginalText.startswith(value):
+        elif IsPartOfText(self.blueprintOriginalText, value):
             isBpo = True
         else:
-            return
+            isBpo = None
 
         def CheckBlueprintType(item):
+            if value == '':
+                return True
+            if isBpo is None:
+                return False
             if item.categoryID == invConst.categoryBlueprint:
                 if isBpo:
                     return item.singleton != appConst.singletonBlueprintCopy

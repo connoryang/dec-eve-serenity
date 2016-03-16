@@ -12,7 +12,8 @@ ALLOWED_ALIGNMENTS = (uiconst.TOLEFT,
  uiconst.CENTER,
  uiconst.CENTERTOP,
  uiconst.CENTERBOTTOM,
- uiconst.CENTERLEFT)
+ uiconst.CENTERLEFT,
+ uiconst.BOTTOMLEFT)
 
 class ContainerAutoSize(Container):
     __guid__ = 'uicontrols.ContainerAutoSize'

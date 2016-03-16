@@ -11,7 +11,7 @@ import util
 import uthread
 import neocomButtons as neocom
 import blue
-import characterskills.util
+import characterskills as charskills
 import service
 import uiutil
 import trinity
@@ -152,7 +152,7 @@ class Neocom(uiprimitives.Container):
             trainingProgressRatio = 0.0
         else:
             currSkillPoints = sm.GetService('skillqueue').GetSkillPointsFromSkillObject(skill.typeID, skill)
-            skillPointsAtStartOfLevel = characterskills.util.GetSPForLevelRaw(skill.skillRank, skill.skillLevel)
+            skillPointsAtStartOfLevel = charskills.GetSPForLevelRaw(skill.skillRank, skill.skillLevel)
             spHi = sm.GetService('skills').SkillpointsNextLevel(skill.typeID)
             trainingProgressRatio = (currSkillPoints - skillPointsAtStartOfLevel) / float(spHi - skillPointsAtStartOfLevel)
         if trainingProgressRatio == 0.0:

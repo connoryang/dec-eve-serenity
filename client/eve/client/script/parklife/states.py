@@ -55,5 +55,13 @@ flagLimitedEngagement = 52
 flagHasKillRight = 53
 flagWarpScrambledMWD = 54
 flagGuidanceDisrupted = 55
+flagRemoteTracking = 56
+flagEnergyTransfer = 57
+flagSensorBooster = 58
+flagECCMProjector = 59
+flagRemoteHullRepair = 60
+flagRemoteArmorRepair = 61
+flagShieldTransfer = 62
+multiSelected = 63
 import carbon.common.script.util.autoexport as autoexport
 exports = autoexport.AutoExports('state', locals())

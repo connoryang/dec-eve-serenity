@@ -104,7 +104,7 @@ class BaseEffectCompiler(service.Service):
             for effectInfo in cfg.dgmeffects:
                 if effectInfo.modifierInfo:
                     try:
-                        self.effects[effectInfo.effectID] = CreateEffect(yaml.safe_load(effectInfo.modifierInfo))
+                        self.effects[effectInfo.effectID] = CreateEffect(effectInfo, yaml.safe_load(effectInfo.modifierInfo))
                     except Exception:
                         self.LogError('Failed to load effect', effectInfo.effectID, yaml.safe_load(effectInfo.modifierInfo))
                         continue

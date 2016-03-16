@@ -776,6 +776,8 @@ class ModuleButton(uiprimitives.Container):
         self.Click(ctrlRepeat)
 
     def Click(self, ctrlRepeat = 0):
+        if self.stateManager.GetReloadTimes(self.id) is not None:
+            return
         if self.waitingForActiveTarget:
             sm.GetService('target').CancelTargetOrder(self)
             self.waitingForActiveTarget = 0

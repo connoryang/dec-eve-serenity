@@ -283,6 +283,15 @@ class QuickTable(Widget):
         self._dom_style = dom_style
         self._attr_map = kwargs
         self.data = dict_or_list_of_lists
+        try:
+            if getattr(getattr(dict_or_list_of_lists, '__class__', None), '__name__', None) == 'DBRow':
+                self.data = {}
+                for key in dict_or_list_of_lists.__keys__:
+                    self.data[key] = dict_or_list_of_lists[key]
+
+        except Exception:
+            self.data = dict_or_list_of_lists
+
         self.attributes = ''
         self.is_vertical = False
         self.has_header = has_header

@@ -69,17 +69,18 @@ primaryGroupActions = {invConst.groupAgentsinSpace: [SimpleRadialMenuAction(opti
  invConst.groupDeadspaceOverseersBelongings: [SimpleRadialMenuAction(option1='UI/Commands/OpenCargo')]}
 bookMarkOption = SimpleRadialMenuAction(option1='UI/Inflight/BookmarkLocation')
 lookAtOption = SimpleRadialMenuAction(option1='UI/Inflight/LookAtObject', option2='UI/Inflight/ResetCamera')
-bookMarkAndLookatOptions = [lookAtOption, bookMarkOption]
+setInterestOption = SimpleRadialMenuAction(option1='UI/Inflight/SetAsCameraInterest')
+bookMarkAndLookatOptions = [lookAtOption, bookMarkOption, setInterestOption]
 secondaryCategoryActions = {invConst.categoryAsteroid: bookMarkAndLookatOptions,
- invConst.categoryEntity: [lookAtOption],
- invConst.categoryShip: [lookAtOption],
+ invConst.categoryEntity: [lookAtOption, setInterestOption],
+ invConst.categoryShip: [lookAtOption, setInterestOption],
  invConst.categoryStation: bookMarkAndLookatOptions,
  invConst.categoryStarbase: bookMarkAndLookatOptions,
  invConst.categorySovereigntyStructure: bookMarkAndLookatOptions,
  invConst.categoryCelestial: bookMarkAndLookatOptions,
  invConst.categoryOrbital: bookMarkAndLookatOptions,
  invConst.categoryDeployable: bookMarkAndLookatOptions,
- invConst.categoryDrone: [lookAtOption] + [SimpleRadialMenuAction(option1='UI/Drones/ReturnDroneAndOrbit'),
+ invConst.categoryDrone: [lookAtOption, setInterestOption] + [SimpleRadialMenuAction(option1='UI/Drones/ReturnDroneAndOrbit'),
                           SimpleRadialMenuAction(option1='UI/Inflight/ScoopToCargoHold'),
                           SimpleRadialMenuAction(option1='UI/Drones/ReturnDroneToBay'),
                           SimpleRadialMenuAction(),
@@ -97,6 +98,7 @@ iconDict = {'UI/Commands/ShowInfo': 'res:/UI/Texture/Icons/44_32_24.png',
  'UI/Inflight/UnlockTarget': 'res:/UI/Texture/classes/RadialMenuActions/untarget.png',
  'UI/Inflight/LookAtObject': 'res:/UI/Texture/Icons/44_32_20.png',
  'UI/Inflight/ResetCamera': 'res:/UI/Texture/classes/RadialMenuActions/resetCamera.png',
+ 'UI/Inflight/SetAsCameraInterest': 'res:/UI/Texture/Icons/44_32_65.png',
  'UI/Inflight/BoardShip': 'res:/UI/Texture/Icons/44_32_40.png',
  'UI/Inflight/DockInStation': 'res:/UI/Texture/Icons/44_32_9.png',
  'UI/Inflight/Jump': 'res:/UI/Texture/Icons/44_32_39.png',

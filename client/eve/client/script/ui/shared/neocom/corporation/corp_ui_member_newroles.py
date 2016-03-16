@@ -90,6 +90,8 @@ class CorpRolesNew(Container):
             self.UpdatePageNrText()
             if self.members.totalCount < MEMBERS_PER_PAGE:
                 self.browseCont.display = False
+        else:
+            self.UpdateScroll(self.GetSelectedState())
 
     def OnSearchEntrySelected(self, result, *args, **kwargs):
         owner = result[0].info

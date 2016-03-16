@@ -14,7 +14,7 @@ import uicls
 import carbonui.const as uiconst
 import localization
 import evetypes
-from characterskills.util import ATTRIBUTEBONUS_BY_ATTRIBUTEID
+import characterskills as charskills
 
 class AttributeRespecWindow(uicontrols.Window):
     __guid__ = 'form.attributeRespecWindow'
@@ -72,13 +72,13 @@ class AttributeRespecWindow(uicontrols.Window):
                 implants = skillSvc.GetImplants()
                 boosters = skillSvc.GetBoosters()
                 for implantSlot, implant in implants.iteritems():
-                    implantBonus += dogmaStaticMgr.GetTypeAttribute2(implant.typeID, ATTRIBUTEBONUS_BY_ATTRIBUTEID[attr])
+                    implantBonus += dogmaStaticMgr.GetTypeAttribute2(implant.typeID, charskills.ATTRIBUTEBONUS_BY_ATTRIBUTEID[attr])
 
                 boosterNoobSlot = 4
                 boosterBonus = 0
                 for boosterTypeID, boosterRecord in boosters.iteritems():
                     if boosterRecord.boosterSlot == boosterNoobSlot:
-                        boosterBonus += dogmaStaticMgr.GetTypeAttribute2(boosterRecord.boosterTypeID, ATTRIBUTEBONUS_BY_ATTRIBUTEID[attr])
+                        boosterBonus += dogmaStaticMgr.GetTypeAttribute2(boosterRecord.boosterTypeID, charskills.ATTRIBUTEBONUS_BY_ATTRIBUTEID[attr])
 
                 attrValue -= implantBonus
                 attrValue -= boosterBonus

@@ -55,7 +55,6 @@ def CreateBackgroundLandscape(scene, medDetailThreshold = 0.0001, lowDetailThres
     scene.envMap1ResPath = 'res:/dx9/scene/universe/m10_cube.dds'
     scene.envMap2ResPath = 'res:/dx9/scene/universe/m10_cube_blur.dds'
     scene.envMap3ResPath = ''
-    scene.gpuParticlePoolManager = trinity.Tr2GPUParticlePoolManager()
     scene.backgroundEffect = trinity.Load('res:/dx9/scene/starfield/nebula.red')
     scene.starfield = trinity.Load('res:/dx9/scene/starfield/spritestars.red')
     scene.starfield.minDist = 40

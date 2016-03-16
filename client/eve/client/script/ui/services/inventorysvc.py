@@ -2,6 +2,7 @@
 import _weakref
 import sys
 import blue
+from eve.client.script.environment.invControllers import ShipCargo
 from eve.client.script.ui.control.treeData import TreeData
 from eve.client.script.ui.shared.inventory.invCommon import SortData
 from eve.client.script.ui.shared.inventory.treeData import TreeDataShip, TreeDataInv, GetContainerDataFromItems, TreeDataStationCorp, TreeDataCelestialParent, TreeDataPOSCorp, TreeDataInvFolder, GetTreeDataClassByInvName
@@ -182,18 +183,8 @@ class InventorySvc(service.Service):
     def GetInvLocationTreeData(self, rootInvID = None):
         data = []
         shipID = util.GetActiveShip()
-        typeID = None
         if shipID:
-            if session.stationid2:
-                activeShip = invCtrl.StationShips().GetActiveShip()
-                if activeShip:
-                    typeID = activeShip.typeID
-            else:
-                godmaLoc = sm.GetService('clientDogmaIM').GetDogmaLocation()
-                if shipID in godmaLoc.dogmaItems:
-                    typeID = godmaLoc.dogmaItems[shipID].typeID
-            if typeID:
-                data.append(TreeDataShip(clsName='ShipCargo', itemID=shipID, typeID=typeID, cmdName='OpenCargoHoldOfActiveShip'))
+            data.append(TreeDataShip(clsName='ShipCargo', itemID=shipID, typeID=ShipCargo(shipID).GetTypeID(), cmdName='OpenCargoHoldOfActiveShip'))
         if session.stationid2:
             shipsData = []
             activeShipID = util.GetActiveShip()

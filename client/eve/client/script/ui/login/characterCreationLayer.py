@@ -274,8 +274,6 @@ class CharacterCreationLayer(uicls.LayerCore):
                 raise UserError('CCNoBloodlineInfo')
             self.raceID = bloodlineInfo.raceID
             mode = self.GetModeIDForDollState(dollState)
-        elif gatekeeper.user.IsInCohort(gatekeeper.cohortTEXShorterCharacterCreation):
-            mode = ccConst.MODE_INITIAL_MINI_CUSTOMIZATION
         else:
             mode = ccConst.MODE_FULLINITIAL_CUSTOMIZATION
         self.SetMode(mode)

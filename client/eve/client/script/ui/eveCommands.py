@@ -1,17 +1,23 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\eveCommands.py
 from carbonui.control.menu import ClearMenuLayer
+from eve.client.script.ui.inflight.overviewSettings import OverviewSettings
 from eve.client.script.ui.inflight.probeScannerWindow import ProbeScannerWindow
 from eve.client.script.parklife.dungeonHelper import IsJessicaOpen
-from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive
+from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive, IsAutoTrackingEnabled
 from eve.client.script.ui.inflight.scannerFiles.directionalScanner import DirectionalScanner
 from eve.client.script.ui.inflight.shipstance import set_stance
 from eve.client.script.ui.shared.fitting.fittingWnd import FittingWindow2
 from eve.client.script.ui.shared.fittingGhost.fittingWndGhost import FittingWindowGhost
+from eve.client.script.ui.shared.mapView.dockPanelUtil import GetDockPanelManager
+from eve.client.script.ui.shared.mapView.mapViewNavigation import MapViewNavigation
 from eve.client.script.ui.shared.mapView.mapViewUtil import IsMapBetaEnabled
 from eve.client.script.ui.shared.planet.planetWindow import PlanetWindow
 from achievements.client.achievementTreeWindow import AchievementTreeWindow
 from eve.client.script.ui.shared.systemMenu.betaOptions import IsBetaScannersEnabled
+from eve.client.script.ui.view import viewStateConst
 import evecamera
+from projectdiscovery import IsProjectDiscoveryEnabled
+from projectdiscovery.client.window import ProjectDiscoveryWindow
 import evetypes
 import uicontrols
 import uicls
@@ -164,7 +170,7 @@ labelsByFuncName = {'CmdAccelerate': 'UI/Commands/CmdAccelerate',
  'CmdToggleEffectTurrets': 'UI/Commands/CmdToggleEffectTurrets',
  'CmdToggleFighterAttackAndFollow': 'UI/Commands/CmdToggleFighterAttackAndFollow',
  'CmdToggleLookAtItem': 'UI/Commands/CmdToggleLookAtItem',
- 'CmdToggleCameraInterest': 'UI/Commands/CmdToggleCameraInterest',
+ 'CmdToggleCameraTracking': 'UI/Commands/CmdToggleCameraTracking',
  'CmdToggleShowAllBrackets': 'UI/Commands/CmdToggleShowAllBrackets',
  'CmdToggleShowNoBrackets': 'UI/Commands/CmdToggleShowNoBrackets',
  'CmdToggleShowSpecialBrackets': 'UI/Commands/CmdToggleShowSpecialBrackets',
@@ -173,6 +179,8 @@ labelsByFuncName = {'CmdAccelerate': 'UI/Commands/CmdAccelerate',
  'CmdUnlockTargetItem': 'UI/Commands/CmdUnlockTargetItem',
  'CmdWarpToItem': 'UI/Commands/CmdWarpToItem',
  'CmdOpenRadialMenu': 'UI/Commands/CmdOpenRadialMenu',
+ 'CmdRefreshDirectionalScan': 'UI/Commands/CmdRefreshDirectionalScan',
+ 'CmdToggleAutoTracking': 'UI/Commands/CmdToggleAutoTracking',
  'WinCmdToggleWindowed': 'UI/Commands/WinCmdToggleWindowed',
  'CmdToggleTrackSelectedItem': 'UI/Commands/CmdToggleTrackSelectedItem',
  'CmdTrackingCameraCenterPosition': 'UI/Commands/CmdTrackingCameraCenterPosition',
@@ -206,7 +214,8 @@ labelsByFuncName = {'CmdAccelerate': 'UI/Commands/CmdAccelerate',
  'CmdToggleSystemMenu': 'UI/Commands/CmdToggleSystemMenu',
  'CmdSetDefenceStance': 'UI/Commands/CmdSetDefenceStance',
  'CmdSetSniperStance': 'UI/Commands/CmdSetSniperStance',
- 'CmdSetSpeedStance': 'UI/Commands/CmdSetSpeedStance'}
+ 'CmdSetSpeedStance': 'UI/Commands/CmdSetSpeedStance',
+ 'CmdToggleProjectDiscovery': 'UI/Commands/CmdToggleProjectDiscovery'}
 CATEGORIES = {'window': 'UI/SystemMenu/Shortcuts/WindowTab',
  'combat': 'UI/SystemMenu/Shortcuts/CombatTab',
  'general': 'UI/SystemMenu/Shortcuts/GeneralTab',
@@ -237,6 +246,7 @@ class EveCommandService(svc.cmd):
         self.combatFunctionLoaded = None
         self.combatCmdLoaded = None
         self.combatCmdCurrentHasExecuted = False
+        self.combatCmdUnloadFunc = None
         self.contextToCommand = {}
         self.labelsByFuncName.update(labelsByFuncName)
         self._telemetrySessionActive = False
@@ -362,7 +372,7 @@ class EveCommandService(svc.cmd):
          c(self.CmdFleetBroadcast_Location, None),
          c(self.CmdSendBroadcast_Target, uiconst.VK_X),
          c(self.CmdCycleFleetBroadcastScope, None),
-         c(self.CmdToggleTrackSelectedItem, uiconst.VK_C),
+         c(self.CmdToggleTrackSelectedItem, uiconst.VK_C if not IsNewCameraActive() else None),
          c(self.CmdTrackingCameraCenterPosition, None),
          c(self.CmdTrackingCameraCustomPosition, None),
          c(self.CmdTrackingCameraTogglePosition, None),
@@ -417,7 +427,7 @@ class EveCommandService(svc.cmd):
          c(self.CmdSelectTargetItem, SHIFT),
          c(self.CmdUnlockTargetItem, (CTRL, SHIFT)),
          c(self.CmdToggleLookAtItem, ALT),
-         c(self.CmdToggleCameraInterest, (ALT, SHIFT)),
+         c(self.CmdToggleCameraTracking, uiconst.VK_C if IsNewCameraActive() else None),
          c(self.CmdApproachItem, uiconst.VK_Q),
          c(self.CmdAlignToItem, uiconst.VK_A),
          c(self.CmdOrbitItem, uiconst.VK_W),
@@ -461,7 +471,8 @@ class EveCommandService(svc.cmd):
          c(self.CmdIncreaseProbeScanRange, None),
          c(self.CmdDecreaseProbeScanRange, None),
          c(self.CmdRefreshProbeScan, None),
-         c(self.CmdRefreshDirectionalScan, None)]
+         c(self.CmdRefreshDirectionalScan, uiconst.VK_V),
+         c(self.CmdToggleAutoTracking, (SHIFT, uiconst.VK_C))]
         for cm in m:
             cm.category = 'combat'
             ret.append(cm)
@@ -533,6 +544,8 @@ class EveCommandService(svc.cmd):
          c(self.ToggleRedeemItems, (ALT, uiconst.VK_Y)),
          c(self.OpenPlanets, None),
          c(self.ToggleOpportunity, None)]
+        if IsProjectDiscoveryEnabled():
+            m.append(c(self.ToggleProjectDiscovery, None))
         if not blue.sysinfo.isTransgaming:
             m.append(c(self.OpenTwitchStreaming, None))
         if bool(session.role & service.ROLE_PROGRAMMER):
@@ -757,10 +770,6 @@ class EveCommandService(svc.cmd):
 
     CmdToggleTacticalOverlay.nameLabelPath = 'Tooltips/Hud/Tactical'
     CmdToggleTacticalOverlay.descriptionLabelPath = 'Tooltips/Hud/Tactical_description'
-
-    def CmdToggleCamera(self, *args):
-        if session.solarsystemid:
-            sm.GetService('viewState').GetCurrentView().ToggleCamera()
 
     def SetSpeedFraction(self, speed):
         remote = sm.GetService('michelle').GetRemotePark()
@@ -1142,36 +1151,51 @@ class EveCommandService(svc.cmd):
         sm.GetService('targetTrackingService').EnableTrackingCamera()
 
     def CmdSetCameraPOV(self):
-        if not IsNewCameraActive():
+        if not self._IsSpaceCameraSwitchAllowed():
             return
-        sceneMan = sm.GetService('sceneManager')
-        sceneMan.SetActiveCameraByID(evecamera.CAM_SHIPPOV)
+        sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_SHIPPOV)
 
     CmdSetCameraPOV.nameLabelPath = 'Tooltips/Hud/POVCamera'
+    CmdSetCameraPOV.descriptionLabelPath = 'Tooltips/Hud/POVCamera_description'
 
     def CmdSetCameraOrbit(self):
-        if not IsNewCameraActive():
+        if not self._IsSpaceCameraSwitchAllowed():
             return
-        sceneMan = sm.GetService('sceneManager')
-        cam = sceneMan.GetActiveCamera()
-        if cam.cameraID == evecamera.CAM_SHIPORBIT and cam.GetItemID() != session.shipid:
-            cam.LookAt(session.shipid)
+        cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
+        if cam.cameraID == evecamera.CAM_SHIPORBIT:
+            if cam.GetItemID() != session.shipid:
+                cam.LookAt(session.shipid)
+            elif cam.isManualFovEnabled:
+                cam.DisableManualFov()
+            else:
+                cam.Track(session.shipid)
         else:
             sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_SHIPORBIT)
 
     CmdSetCameraOrbit.nameLabelPath = 'Tooltips/Hud/OrbitCamera'
+    CmdSetCameraOrbit.descriptionLabelPath = 'Tooltips/Hud/OrbitCamera_description'
 
     def CmdSetCameraTactical(self):
-        if not IsNewCameraActive():
+        if not self._IsSpaceCameraSwitchAllowed():
             return
-        sceneMan = sm.GetService('sceneManager')
-        cam = sceneMan.GetActiveCamera()
+        cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
         if cam.cameraID == evecamera.CAM_TACTICAL:
             cam.LookAt(session.shipid, allowSwitchCamera=False)
         else:
             sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_TACTICAL)
 
     CmdSetCameraTactical.nameLabelPath = 'Tooltips/Hud/TacticalCamera'
+    CmdSetCameraTactical.descriptionLabelPath = 'Tooltips/Hud/TacticalCamera_description'
+
+    def _IsSpaceCameraSwitchAllowed(self):
+        if not IsNewCameraActive():
+            return False
+        if not sm.GetService('viewState').IsViewActive(ViewState.Space):
+            return
+        cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
+        if not cam or cam.IsLocked():
+            return False
+        return True
 
     def OpenCapitalNavigation(self, *args):
         if eveCfg.GetActiveShip():
@@ -1284,6 +1308,12 @@ class EveCommandService(svc.cmd):
 
     ToggleAurumStore.nameLabelPath = 'UI/VirtualGoodsStore/VgsName'
     ToggleAurumStore.descriptionLabelPath = 'Tooltips/Neocom/Vgs_description'
+
+    def ToggleProjectDiscovery(self, *args):
+        ProjectDiscoveryWindow.ToggleOpenClose()
+
+    ToggleProjectDiscovery.nameLabelPath = 'UI/ProjectDiscovery/ProjectName'
+    ToggleProjectDiscovery.descriptionLabelPath = 'Tooltips/Neocom/ProjectDiscoveryDescription'
 
     def ToggleRedeemItems(self, *args):
         if session.charid is not None:
@@ -1479,10 +1509,10 @@ class EveCommandService(svc.cmd):
     OpenCalculator.descriptionLabelPath = form.Calculator.default_descriptionLabelPath
 
     def OpenOverviewSettings(self, *args):
-        form.OverviewSettings.Open()
+        OverviewSettings.Open()
 
-    OpenOverviewSettings.nameLabelPath = form.OverviewSettings.default_captionLabelPath
-    OpenOverviewSettings.descriptionLabelPath = form.OverviewSettings.default_descriptionLabelPath
+    OpenOverviewSettings.nameLabelPath = OverviewSettings.default_captionLabelPath
+    OpenOverviewSettings.descriptionLabelPath = OverviewSettings.default_descriptionLabelPath
 
     def OpenCorpHangar(self, *args):
         office = sm.GetService('corp').GetOffice()
@@ -1800,7 +1830,7 @@ class EveCommandService(svc.cmd):
 
     def HideUI(self):
         sm.GetService('tutorial').ChangeTutorialWndState(visible=0)
-        layersToHide = ('abovemain', 'main', 'login', 'intro', 'charsel', 'shipui', 'bracket', 'target', 'tactical', 'sidePanels')
+        layersToHide = ('abovemain', 'main', 'login', 'intro', 'charsel', 'shipui', 'bracket', 'target', 'tactical')
         hiddenUIState = []
         for each in layersToHide:
             layer = uicore.layer.Get(each)
@@ -1924,8 +1954,8 @@ class EveCommandService(svc.cmd):
         cmd = uicore.cmd.commandMap.GetCommandByName('CmdToggleLookAtItem')
         self.LoadCombatCommand(sm.GetService('menu').ToggleLookAt, cmd)
 
-    def CmdToggleCameraInterest(self):
-        cmd = uicore.cmd.commandMap.GetCommandByName('CmdToggleCameraInterest')
+    def CmdToggleCameraTracking(self):
+        cmd = uicore.cmd.commandMap.GetCommandByName('CmdToggleCameraTracking')
         self.LoadCombatCommand(sm.GetService('menu').SetInterest, cmd)
 
     def CmdApproachItem(self):
@@ -2017,14 +2047,22 @@ class EveCommandService(svc.cmd):
     def CmdFlightControlsUp(self):
         pass
 
+    CmdFlightControlsUp.nameLabelPath = 'UI/Commands/CmdFlightControlsUp'
+
     def CmdFlightControlsDown(self):
         pass
+
+    CmdFlightControlsDown.nameLabelPath = 'UI/Commands/CmdFlightControlsDown'
 
     def CmdFlightControlsLeft(self):
         pass
 
+    CmdFlightControlsLeft.nameLabelPath = 'UI/Commands/CmdFlightControlsLeft'
+
     def CmdFlightControlsRight(self):
         pass
+
+    CmdFlightControlsRight.nameLabelPath = 'UI/Commands/CmdFlightControlsRight'
 
     def LoadCombatCommand(self, function, cmd):
         if not session.solarsystemid:
@@ -2032,7 +2070,10 @@ class EveCommandService(svc.cmd):
         sm.GetService('ui').SetFreezeOverview(freeze=True)
         self.combatFunctionLoaded = function
         self.combatCmdLoaded = cmd
-        uicore.event.RegisterForTriuiEvents((uiconst.UI_KEYUP, uiconst.UI_KEYDOWN, uiconst.UI_ACTIVE), self.CombatKeyUnloadListener)
+        uicore.event.RegisterForTriuiEvents((uiconst.UI_KEYUP,
+         uiconst.UI_KEYDOWN,
+         uiconst.UI_ACTIVE,
+         uiconst.UI_MOUSEUP), self.CombatKeyUnloadListener)
         delayMs = 300
         for key in cmd.shortcut:
             if key not in uiconst.MODKEYS:
@@ -2051,9 +2092,14 @@ class EveCommandService(svc.cmd):
         sm.GetService('ui').SetFreezeOverview(freeze=False)
         self.combatFunctionLoaded = None
         self.combatCmdLoaded = None
+        if self.combatCmdUnloadFunc:
+            self.combatCmdUnloadFunc(self.combatCmdCurrentHasExecuted)
+            self.combatCmdUnloadFunc = None
         self.combatCmdCurrentHasExecuted = False
 
     def CombatKeyUnloadListener(self, wnd, eventID, keyChange):
+        if eventID == uiconst.UI_MOUSEUP and keyChange[0] in (uiconst.MOUSELEFT, uiconst.MOUSERIGHT):
+            return True
         if eventID == uiconst.UI_ACTIVE:
             self.UnloadCombatCommand()
             return
@@ -2070,21 +2116,27 @@ class EveCommandService(svc.cmd):
 
         return True
 
-    def ExecuteCombatCommand(self, itemID, eventID):
+    def ExecuteCombatCommand(self, itemID, eventID, **kwargs):
         if itemID is None or self.combatFunctionLoaded is None:
             return False
         if eventID == uiconst.UI_KEYUP and self.combatCmdCurrentHasExecuted:
             self.UnloadCombatCommand()
             return True
         self.combatCmdCurrentHasExecuted = True
-        uthread.new(self.combatFunctionLoaded, itemID)
+        self.ExecuteActiveCombatCommand(itemID, **kwargs)
         return True
+
+    def ExecuteActiveCombatCommand(self, itemID, **kwargs):
+        uthread.new(self.combatFunctionLoaded, itemID, **kwargs)
 
     def IsSomeCombatCommandLoaded(self):
         return self.combatFunctionLoaded is not None
 
     def IsCombatCommandLoaded(self, cmdName):
         return self.combatCmdLoaded == self.commandMap.GetCommandByName(cmdName)
+
+    def GetCombatCmdLoadedName(self):
+        return self.combatCmdLoaded
 
     def CmdForceFadeFromBlack(self, *args):
         loadSvc = sm.GetService('loading')
@@ -2111,6 +2163,7 @@ class EveCommandService(svc.cmd):
     def Reset(self, resetKey):
         if resetKey == 'windows':
             sm.GetService('window').ResetWindowSettings()
+            GetDockPanelManager().ResetAllPanelSettings()
         elif resetKey == 'window color':
             sm.GetService('uiColor').LoadUIColors(reset=True)
         elif resetKey == 'clear cache':
@@ -2145,13 +2198,7 @@ class EveCommandService(svc.cmd):
         escCommand.Execute()
 
     def OnTab(self):
-        focus = uicore.registry.GetFocus()
-        if focus is not None and focus in (uicore.desktop, uicore.layer.charcontrol, uicore.layer.shiptree):
-            if IsNewCameraActive():
-                self.CmdToggleCamera()
-            else:
-                uicore.registry.ToggleCollapseAllWindows()
-        elif uicore.uilib.Key(uiconst.VK_SHIFT):
+        if uicore.uilib.Key(uiconst.VK_SHIFT):
             uicore.registry.FindFocus(-1)
         else:
             uicore.registry.FindFocus(1)
@@ -2280,11 +2327,30 @@ class EveCommandService(svc.cmd):
     CmdRefreshProbeScan.nameLabelPath = 'UI/Commands/CmdRefreshProbeScan'
 
     def CmdRefreshDirectionalScan(self, *args):
-        if session.solarsystemid:
-            from eve.client.script.ui.inflight.scannerFiles.directionalScannerWindow import DirectionalScanner
-            directionalScanWindow = DirectionalScanner.GetIfOpen()
-            if directionalScanWindow:
-                directionalScanWindow.Confirm()
-            return True
+        if not session.solarsystemid:
+            return
+        from eve.client.script.ui.inflight.scannerFiles.directionalScannerWindow import DirectionalScanner
+        if IsNewCameraActive() and IsBetaScannersEnabled():
+            wnd = DirectionalScanner.GetIfOpen()
+            if not wnd:
+                wnd = DirectionalScanner.Open(scanOnOpen=False)
+            cmd = uicore.cmd.commandMap.GetCommandByName('CmdRefreshDirectionalScan')
+            self.LoadCombatCommand(wnd.ScanTowardsItem, cmd)
+            self.combatCmdUnloadFunc = wnd.OnCmdDirectionalScanUnload
+            wnd.OnCmdDirectionalScanLoad()
+        else:
+            wnd = DirectionalScanner.GetIfOpen()
+            if wnd:
+                wnd.Confirm()
 
     CmdRefreshDirectionalScan.nameLabelPath = 'UI/Commands/CmdRefreshDirectionalScan'
+
+    def CmdToggleAutoTracking(self, *args):
+        if not session.solarsystemid:
+            return
+        if not IsNewCameraActive():
+            return
+        settings.char.ui.Set('orbitCameraAutoTracking', not IsAutoTrackingEnabled())
+        sm.ScatterEvent('OnAutoTrackingChanged')
+
+    CmdToggleAutoTracking.nameLabelPath = 'UI/Commands/CmdToggleAutoTracking'

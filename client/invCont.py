@@ -20,6 +20,7 @@ from eve.client.script.ui.shared.inventory.invContainers import ShipAmmoHold
 from eve.client.script.ui.shared.inventory.invContainers import ShipCargo
 from eve.client.script.ui.shared.inventory.invContainers import ShipCommandCenterHold
 from eve.client.script.ui.shared.inventory.invContainers import ShipDroneBay
+from eve.client.script.ui.shared.inventory.invContainers import ShipFighterBay
 from eve.client.script.ui.shared.inventory.invContainers import ShipFleetHangar
 from eve.client.script.ui.shared.inventory.invContainers import ShipFuelBay
 from eve.client.script.ui.shared.inventory.invContainers import ShipGasHold

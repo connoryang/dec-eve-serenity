@@ -1,10 +1,10 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\fitting\fittingSlotController.py
 import sys
+import signals
 from carbon.common.script.util.logUtil import LogException
 from carbonui import const as uiconst
 from eve.client.script.ui.shared.fitting.fittingUtil import GetPowerType
 from eve.client.script.ui.shared.fittingGhost.slotControllerGhostFittingExtension import ShipFittingSlotControllerGhostFittingExtension
-from fsdlite import Signal
 from inventorycommon import const as invConst
 from localization import GetByLabel
 
@@ -16,8 +16,8 @@ class FittingSlotController(object):
         self.chargeItemID = None
         self.parentController = parentController
         self.ghostFittingExtension = ShipFittingSlotControllerGhostFittingExtension(self)
-        self.on_online_state_change = Signal()
-        self.on_item_fitted = Signal()
+        self.on_online_state_change = signals.Signal()
+        self.on_item_fitted = signals.Signal()
 
     @apply
     def dogmaModuleItem():

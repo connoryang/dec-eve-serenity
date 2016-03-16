@@ -2,7 +2,7 @@
 from carbonui.control.scrollentries import SE_BaseClassCore
 from carbonui.util.color import Color
 from eve.client.script.ui.control.eveWindowUnderlay import ListEntryUnderlay
-from eve.client.script.ui.services.menuSvcExtras.menuFunctions import ActivatePlex, ActivateMultiTraining, ActivateCharacterReSculpt
+from eve.client.script.ui.services.menuSvcExtras.menuFunctions import ActivatePlex, ActivateMultiTraining, ActivateCharacterReSculpt, ActivateSkillExtractor, ActivateSkillInjector
 from eve.client.script.ui.shared.fitting.ghostFittingHelpers import TryGhostFitItemOnMouseAction
 from eve.client.script.ui.shared.market.sellMulti import SellItems
 from eve.common.script.util import industryCommon
@@ -400,6 +400,8 @@ class InvItem(uicontrols.SE_BaseClassCore):
                 ActivateCharacterReSculpt(self.rec.itemID)
             elif self.typeID == const.typeMultiTrainingToken:
                 ActivateMultiTraining(self.rec.itemID)
+            elif self.typeID == const.typeSkillInjector:
+                ActivateSkillInjector(self.rec.itemID, self.rec.stacksize)
             elif not sm.GetService('menu').CheckSameLocation(self.rec):
                 return
             if self.isShip and session.stationid:
@@ -408,6 +410,8 @@ class InvItem(uicontrols.SE_BaseClassCore):
                 sm.GetService('menu').AssembleShip([self.rec])
             elif self.isUnassembledContainer:
                 sm.GetService('menu').AssembleContainer([self.rec])
+            elif self.typeID == const.typeSkillExtractor:
+                ActivateSkillExtractor(self.rec)
 
     def OnMouseDown(self, *args):
         if getattr(self, 'powerType', None):

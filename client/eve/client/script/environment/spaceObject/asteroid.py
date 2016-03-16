@@ -45,13 +45,11 @@ class AsteroidEnvironment(object):
             elif binding.name == 'FogAmount':
                 binding.destinationObject = FogAmountParameters
 
-    def _InitCloudfield(self):
+    def _InitCloudfield(self, scene, camera):
         if not gfxSettings.Get(gfxSettings.UI_ASTEROID_CLOUDFIELD):
             return
         cf = trinity.Load(self._cloudfieldPath)
         constraint = cf.Find('trinity.EveDustfieldConstraint')[0]
-        scene = self.sceneManager.GetRegisteredScene('default')
-        camera = self.sceneManager.GetActiveCamera()
         scene.cloudfield = cf
         scene.cloudfieldConstraint = constraint
         constraint.cameraView = camera.viewMatrix
@@ -66,10 +64,9 @@ class AsteroidEnvironment(object):
                 each.destinationObject = colorParam
                 break
 
-    def _InitGodrays(self):
+    def _InitGodrays(self, scene):
         if sm.GetService('visualEffect').IsGodrayEnabled():
             return
-        scene = self.sceneManager.GetRegisteredScene('default')
         if scene.sunBall is None:
             return
         scene.sunBall.EnableGodRays(True)
@@ -83,13 +80,15 @@ class AsteroidEnvironment(object):
         if not gfxSettings.Get(gfxSettings.UI_ASTEROID_ATMOSPHERICS):
             return
         scene = self.sceneManager.GetRegisteredScene('default')
+        camera = self.sceneManager.GetActiveSpaceCamera()
+        if camera is None or scene is None:
+            return
         if len(self.distanceField.objects) == 0:
             self.isIcefield = asteroid.typeData['groupID'] == const.groupIce
             self._InitFog()
-            self._InitCloudfield()
-            self._InitGodrays()
+            self._InitCloudfield(scene, camera)
+            self._InitGodrays(scene)
         if self.distanceField not in scene.distanceFields:
-            camera = self.sceneManager.GetActiveCamera()
             self.distanceField.cameraView = camera.viewMatrix
             scene.distanceFields.append(self.distanceField)
         self.distanceField.objects.append(asteroid)

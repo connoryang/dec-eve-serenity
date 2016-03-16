@@ -22,6 +22,7 @@ class FittingCenter(FittingLayout):
         self.controller = attributes.controller
         self.controller.on_stats_changed.connect(self.UpdateGauges)
         self.controller.on_new_itemID.connect(self.OnNewItem)
+        self.controller.on_slots_with_menu_changed.connect(self.OnSlotsWithMenuChanged)
         self.slots = {}
         self.slotList = []
         self.menuSlots = {}
@@ -57,7 +58,11 @@ class FittingCenter(FittingLayout):
         self.slotCont = Container(parent=self, name='slotCont', align=uiconst.TOALL, state=uiconst.UI_PICKCHILDREN, idx=0)
         self.slotList = []
         slotAdder = SlotAdder(self.controller)
-        for groupIdx, group in enumerate(self.controller.GetSlotsByGroups()):
+        numSlotGroups = len(self.controller.GetSlotsByGroups())
+        for groupIdx in xrange(numSlotGroups):
+            group = self.controller.GetSlotsByGroups().get(groupIdx, None)
+            if group is None:
+                continue
             arcStart, arcLength = self.controller.SLOTGROUP_LAYOUT_ARCS[groupIdx]
             slotAdder.StartGroup(arcStart, arcLength, len(group))
             for slotIdx, slotController in enumerate(group):
@@ -173,6 +178,11 @@ class FittingCenter(FittingLayout):
          uicore.uilib.y - 5,
          10,
          10)
+
+    def OnSlotsWithMenuChanged(self, oldFlagID, newFlagID):
+        slot = self.slots.get(oldFlagID, None)
+        if slot is not None:
+            slot.HideUtilButtons()
 
 
 class ShipSceneParent(Container):

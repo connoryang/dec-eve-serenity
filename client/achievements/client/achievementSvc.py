@@ -1,8 +1,8 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\achievements\client\achievementSvc.py
 from achievements.client.eventHandler import EventHandler
 from achievements.common.achievementConst import AchievementSettingConst
+from achievements.common.statsTracker import StatsTracker
 from achievements.common.util import UpdateAndGetNewAchievements, GetClientAchievements, GetAchievementsByEventsDict
-from achievements.common.achievementController import StatsTracker
 from achievements.common.achievementGroups import GetGroupForAchievement, GetTaskIds, GroupTriggeredByTask, GetActiveAchievementGroup
 from achievements.common.achievementLoader import AchievementLoader
 from achievements.common.achievementGroups import GetAchievementGroup
@@ -33,12 +33,18 @@ class AchievementTrackerClientService(service.Service):
     def Run(self, memStream = None, remoteService = None, scatterService = sm):
         self.scatterService = scatterService
         self.eventHandler = EventHandler(self)
-        self.allAchievements = self.LoadAchievements(getDisabled=True)
-        self.clientAchievements = GetClientAchievements(self.allAchievements)
+        self._allAchievements = self.LoadAchievements(getDisabled=True)
+        self.clientAchievements = GetClientAchievements(self._allAchievements)
         self.achievementsByEventsDict = GetAchievementsByEventsDict(self.clientAchievements)
         self.clientStatsTracker = StatsTracker()
         self.completedDict = {}
         self.scatterService.ScatterEvent('OnAchievementsDataInitialized')
+
+    def GetAllAchievements(self):
+        return self._allAchievements
+
+    def GetCompletedTaskIds(self):
+        return self.completedDict.keys()
 
     def UpdateEnabledStatus(self):
         self.achievementsEnabled = sm.GetService('experimentClientSvc').OpportunitiesEnabled()
@@ -55,7 +61,7 @@ class AchievementTrackerClientService(service.Service):
         return self.hasAllData
 
     def GetFullAchievementList(self):
-        return self.allAchievements.values()
+        return self._allAchievements.values()
 
     def LogTaskCompletion(self, taskCompletedID):
         activeAchievementID = self.GetActiveAchievementGroupID()
@@ -69,9 +75,7 @@ class AchievementTrackerClientService(service.Service):
         sm.GetService('infoGatheringSvc').LogInfoEvent(eventTypeID=infoEventConst.infoEventTaskCompleted, itemID=charID, itemID2=userID, int_1=int(taskCompletedID), int_2=int(activeAchievementID), int_3=int(self.IsAchievementInGroup(taskCompletedID, activeAchievementID)), float_1=float(auraSuppressed), float_2=float(infoPanelSuppressed), float_3=float(notificationSuppressed))
 
     def OnAchievementsReset(self):
-        for eachAchievement in self.allAchievements.itervalues():
-            eachAchievement.completed = False
-
+        self.completedDict = {}
         self.FetchMyAchievementStatus()
         self.scatterService.ScatterEvent('OnAchievementsDataInitialized')
         self.AuraIntroduction()
@@ -94,7 +98,7 @@ class AchievementTrackerClientService(service.Service):
         return settings.char.ui.Get('opportunities_active_group', None)
 
     def GetAchievementTask(self, achievementTaskID):
-        return self.allAchievements.get(achievementTaskID, None)
+        return self._allAchievements.get(achievementTaskID, None)
 
     def OnServerAchievementUnlocked(self, achievementsInfo):
         if sm.GetService('experimentClientSvc').OpportunitiesEnabled():
@@ -114,20 +118,16 @@ class AchievementTrackerClientService(service.Service):
         if taskIdsForMyGroup is None:
             taskIdsForMyGroup = GetTaskIds()
         for achievementID in achievementDict:
-            if achievementID not in self.allAchievements:
+            if achievementID not in self._allAchievements:
                 continue
             if achievementID not in taskIdsForMyGroup:
                 continue
-            achievement = self.allAchievements[achievementID]
+            achievement = self._allAchievements[achievementID]
             self.SendAchievementNotification(achievementID)
             self.SendOpportunityNotification(achievementID)
-            activeGroupID = self.GetActiveAchievementGroupID()
-            if activeGroupID and self.IsAchievementInGroup(achievementID, activeGroupID):
-                activeGroupCompleted = self.IsCurrentGroupCompleted()
-            else:
-                activeGroupCompleted = False
-            self.TriggerAura(achievementID, activeGroupCompleted)
-            sm.ScatterEvent('OnAchievementChanged', achievement, activeGroupCompleted=activeGroupCompleted)
+            isActiveGroupCompleted = self.IsGroupForTaskActiveAndCompleted(achievementID)
+            self.TriggerAura(achievementID, isActiveGroupCompleted)
+            sm.ScatterEvent('OnAchievementChanged', achievement, activeGroupCompleted=isActiveGroupCompleted)
 
     def TriggerAura(self, achievementID, activeGroupCompleted):
         if settings.user.ui.Get(AchievementSettingConst.AURA_DISABLE_CONFIG, False):
@@ -141,12 +141,11 @@ class AchievementTrackerClientService(service.Service):
             auraWindow.Step_ActiveCompleted()
 
     def MarkAchievementAsCompleted(self, achievementDict):
-        for achievementID, timestamp in achievementDict.iteritems():
-            if achievementID not in self.allAchievements:
+        for taskID, timestamp in achievementDict.iteritems():
+            if taskID not in self._allAchievements:
                 continue
-            self.completedDict[achievementID] = timestamp
-            self.allAchievements[achievementID].completed = True
-            self.LogTaskCompletion(achievementID)
+            self.completedDict[taskID] = timestamp
+            self.LogTaskCompletion(taskID)
 
     def SendAchievementNotification(self, achievementID):
         notificationData = AchievementTaskFormatter.MakeData(achievementID)
@@ -177,10 +176,25 @@ class AchievementTrackerClientService(service.Service):
             else:
                 self.clientStatsTracker.LogStatistic(eventName, eventCount, addToUnlogged=False)
 
+    def IsGroupForTaskActiveAndCompleted(self, taskID):
+        activeGroupID = self.GetActiveAchievementGroupID()
+        if activeGroupID and self.IsAchievementInGroup(taskID, activeGroupID):
+            activeGroupCompleted = self._IsActiveGroupCompleted()
+        else:
+            activeGroupCompleted = False
+        return activeGroupCompleted
+
+    def _IsActiveGroupCompleted(self):
+        currentGroupID = self.GetActiveAchievementGroupID()
+        if not currentGroupID:
+            return False
+        achievementGroup = GetAchievementGroup(currentGroupID)
+        return achievementGroup.IsCompleted()
+
     def UpdateAchievementList(self):
         for achievementID in self.completedDict:
-            if achievementID in self.allAchievements:
-                self.allAchievements[achievementID].completed = True
+            if achievementID in self._allAchievements:
+                self._allAchievements[achievementID].completed = True
 
     def LoadAchievements(self, getDisabled = False):
         return AchievementLoader().GetAchievements(getDisabled=getDisabled)
@@ -194,13 +208,6 @@ class AchievementTrackerClientService(service.Service):
             return achievementGroup.HasAchievement(achievementID)
         else:
             return False
-
-    def IsCurrentGroupCompleted(self):
-        currentGroupID = self.GetActiveAchievementGroupID()
-        if not currentGroupID:
-            return False
-        achievementGroup = GetAchievementGroup(currentGroupID)
-        return achievementGroup.IsCompleted()
 
     def OnSessionChanged(self, isRemote, session, change):
         if 'charid' in change and not self.HasData():

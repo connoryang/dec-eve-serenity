@@ -7,6 +7,7 @@ from eve.client.script.ui.inflight.probeScannerWindow import ProbeScannerWindow
 from eve.client.script.ui.inflight.scannerFiles.directionalScanUtil import SCANMODE_CAMERA, GetActiveScanMode, ToggleScanMode, GetScanConeDisplayState, SetScanConeDisplayState
 from eve.client.script.ui.inflight.scannerFiles.directionalScannerWindow import DirectionalScanner
 from eve.client.script.ui.shared.mapView.dockPanel import DockablePanel
+from eve.client.script.ui.shared.mapView.dockPanelConst import DOCKPANELID_SOLARSYSTEMMAP
 from eve.client.script.ui.shared.mapView.mapViewConst import MAPVIEW_SOLARSYSTEM_ID
 from eve.client.script.ui.shared.mapView.mapViewScannerNavigationStandalone import MapViewScannerNavigation
 from eve.client.script.ui.shared.mapView.mapViewSolarSystem import MapViewSolarSystem
@@ -16,10 +17,15 @@ import localization
 import uthread
 
 class SolarSystemViewPanel(DockablePanel):
-    __notifyevents__ = ['OnBallparkSetState', 'OnTacticalOverlayChange', 'OnSessionChanged']
+    __notifyevents__ = ['OnBallparkSetState',
+     'OnTacticalOverlayChange',
+     'OnSessionChanged',
+     'OnSetCameraOffset',
+     'OnHideUI',
+     'OnShowUI']
     default_captionLabelPath = None
     default_caption = None
-    default_windowID = 'SolarSystemViewPanel'
+    default_windowID = DOCKPANELID_SOLARSYSTEMMAP
     default_iconNum = 'res:/UI/Texture/classes/ProbeScanner/solarsystemMapButton.png'
     panelID = default_windowID
     mapView = None
@@ -28,9 +34,8 @@ class SolarSystemViewPanel(DockablePanel):
 
     def ApplyAttributes(self, attributes):
         DockablePanel.ApplyAttributes(self, attributes)
-        self.showRangeIndicator = settings.user.overview.Get('viewTactical', 0)
+        self.showRangeIndicator = sm.GetService('tactical').IsTacticalOverlayActive()
         self.mapView = MapViewSolarSystem(parent=self.GetMainArea(), showInfobox=False, navigationPadding=(0, 0, 0, 0), navigationClass=MapViewScannerNavigation, mapViewID=self.mapViewID, showSolarSystemNebula=False, showStarfield=False, showDebugInfo=False, sceneBlendMode=None, stackMarkers=True)
-        self.mapView.LoadGenericBackdrop()
         sceneOptionsContainer = Container(parent=self.toolbarContainer, align=uiconst.CENTERLEFT, width=100, height=32, left=4, idx=0)
         from eve.client.script.ui.shared.mapView.mapViewSettings import MapViewMarkersSettingButton
         self.markersSettingButton = MapViewMarkersSettingButton(parent=sceneOptionsContainer, callback=self.OnMarkersSettingChanged, mapViewID=self.mapViewID, align=uiconst.TOPLEFT, left=2, top=2)
@@ -40,6 +45,15 @@ class SolarSystemViewPanel(DockablePanel):
         self.dScanOptions.tooltipPointer = uiconst.POINT_TOP_1
         self.dScanOptions.LoadTooltipPanel = self.LoadDScanTooltipPanel
         uthread.new(self.LoadSolarSystem)
+        if uicore.cmd.IsUIHidden():
+            self.OnHideUI()
+
+    def OnShowUI(self):
+        self.toolbarContainer.display = True
+
+    def OnHideUI(self):
+        if self.IsFullscreen():
+            self.toolbarContainer.display = False
 
     def StartDirectionalScanHandler(self):
         self.mapView.currentSolarsystem.EnableDirectionalScanHandler()
@@ -68,7 +82,7 @@ class SolarSystemViewPanel(DockablePanel):
         pass
 
     def OnTacticalOverlayChange(self):
-        visible = settings.user.overview.Get('viewTactical', 0)
+        visible = sm.GetService('tactical').IsTacticalOverlayActive()
         self.showRangeIndicator = visible
         if visible:
             self.mapView.currentSolarsystem.ShowRangeIndicator()
@@ -78,6 +92,14 @@ class SolarSystemViewPanel(DockablePanel):
     def OnBallparkSetState(self):
         if not self.destroyed:
             uthread.new(self.LoadSolarSystem)
+
+    def OnSetCameraOffset(self, camera, cameraOffset):
+        if self.IsFullscreen():
+            cameraOffset = sm.GetService('sceneManager').GetCameraOffset('default')
+            x = -(cameraOffset * 0.5 - 0.5)
+            self.mapView.camera.cameraCenter = (x, 0.5)
+        else:
+            self.mapView.camera.cameraCenter = (0.5, 0.5)
 
     def OnSessionChanged(self, isRemote, session, change):
         if 'locationid' in change and not IsSolarSystem(change['locationid'][1]):

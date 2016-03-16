@@ -3,7 +3,8 @@ import sys
 import types
 import random
 import datetime
-from eve.client.script.ui.camera.cameraUtil import GetCameraMaxLookAtRange
+from eve.client.script.parklife import states
+from eve.client.script.ui.camera.cameraUtil import GetCameraMaxLookAtRange, IsNewCameraActive
 from eve.client.script.ui.services.menuSvcExtras.menuConsts import GetReasonsDict, GetMultiFunctionList
 from eve.client.script.ui.shared.fitting.fittingUtil import TryFit
 from eve.client.script.ui.shared.industry.industryWnd import Industry
@@ -210,6 +211,7 @@ class MenuSvc(service.Service):
         checkIfShipPlanetaryCommoditiesHold = categoryID == const.categoryShip and bool(godmaSM.GetType(invItem.typeID).specialPlanetaryCommoditiesHoldCapacity)
         checkIfShipHasQuafeBay = categoryID == const.categoryShip and bool(godmaSM.GetType(invItem.typeID).specialQuafeHoldCapacity)
         checkIfShipHasDroneBay = categoryID == const.categoryShip and bool(godmaSM.GetType(invItem.typeID).droneCapacity or IsModularShip(invItem.typeID))
+        checkIfShipHasFighterBay = categoryID == const.categoryShip and bool(godmaSM.GetType(invItem.typeID).fighterCapacity)
         checkViewOnly = bool(viewOnly)
         checkIfAtStation = util.IsStation(invItem.locationID)
         checkIfActiveShip = invItem.itemID == util.GetActiveShip()
@@ -251,6 +253,8 @@ class MenuSvc(service.Service):
         checkServiceItem = invItem.groupID == const.groupServices
         checkReverseRedeemable = invItem.groupID in const.reverseRedeemingLegalGroups
         checkShipSkin = invItem.groupID == const.groupShipSkins
+        checkSkillExtractor = invItem.typeID == const.typeSkillExtractor
+        checkSkillInjector = invItem.typeID == const.typeSkillInjector
         checkTrashable = not checkIfActiveShip and not checkPilotLicence and not checkAurumToken and not checkServiceItem
         checkSecContainer = groupID in (const.groupSecureCargoContainer, const.groupAuditLogSecureContainer)
         checkIfInQuickBar = invItem.typeID in settings.user.ui.Get('marketquickbar', [])
@@ -341,6 +345,12 @@ class MenuSvc(service.Service):
                 menuEntries += [[uiutil.MenuLabel('UI/Commands/ActivateCharacterReSculptToken'), self.ActivateCharacterReSculpt, (invItem.itemID,)]]
             if checkMultiTrainingToken and not checkMultiSelection:
                 menuEntries += [[uiutil.MenuLabel('UI/Commands/ActivateMultiTrainingToken'), self.ActivateMultiTraining, (invItem.itemID,)]]
+            if checkSkillExtractor and not checkMultiSelection:
+                menuEntries += [[uiutil.MenuLabel('UI/Commands/ActivateSkillExtractor'), self.ActivateSkillExtractor, (invItem,)]]
+            if checkSkillInjector and not checkMultiSelection:
+                label = uiutil.MenuLabel('UI/Commands/ActivateSkillInjector', {'injector': const.typeSkillInjector,
+                 'quantity': invItem.stacksize})
+                menuEntries += [[label, self.ActivateSkillInjector, (invItem.itemID, invItem.stacksize)]]
         menuEntries += [None]
         if not checkViewOnly and checkSameLocation and not checkMultiSelection and checkSingleton:
             if checkSecContainer and checkIfInStation:
@@ -445,6 +455,8 @@ class MenuSvc(service.Service):
                 menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenCargoHold'), openFunctions.OpenShipHangarCargo, [invItem.itemID]]]
             if checkIfShipHasDroneBay:
                 menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenDroneBay'), openFunctions.OpenDroneBay, [invItem.itemID]]]
+            if checkIfShipHasFighterBay:
+                menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenFighterBay'), openFunctions.OpenFighterBay, [invItem.itemID]]]
             if checkIfShipMAShip:
                 menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenShipMaintenanceBay'), openFunctions.OpenShipMaintenanceBayShip, (invItem.itemID, localization.GetByLabel('UI/Commands/OpenShipMaintenanceBayError'))]]
             if checkIfShipFHShip:
@@ -1764,6 +1776,7 @@ class MenuSvc(service.Service):
         checkSpewContainer = groupID == const.groupSpewContainer
         checkZeroSecSpace = checkInSpace and sm.StartService('map').GetSecurityClass(session.solarsystemid) == const.securityClassZeroSec
         checkIfShipDroneBay = slimItem and categoryID == const.categoryShip and bool(godmaSM.GetType(typeID).droneCapacity or IsModularShip(typeID))
+        checkIfShipFighterBay = slimItem and categoryID == const.categoryShip and bool(godmaSM.GetType(typeID).fighterCapacity)
         checkIfShipFuelBay = slimItem and categoryID == const.categoryShip and bool(godmaSM.GetType(typeID).specialFuelBayCapacity)
         checkIfShipOreHold = slimItem and categoryID == const.categoryShip and bool(godmaSM.GetType(typeID).specialOreHoldCapacity)
         checkIfShipGasHold = slimItem and categoryID == const.categoryShip and bool(godmaSM.GetType(typeID).specialGasHoldCapacity)
@@ -1949,7 +1962,7 @@ class MenuSvc(service.Service):
              const.groupStargate,
              const.groupFreightContainer,
              const.groupWreck)
-            checkLookingAtItem = bool(sm.GetService('sceneManager').GetActiveSpaceCamera().LookingAt() == itemID)
+            checkLookingAtItem = bool(sm.GetService('sceneManager').GetActiveSpaceCamera().GetLookAtItemID() == itemID)
             camera = sm.GetService('sceneManager').GetRegisteredCamera(evecamera.CAM_SPACE_PRIMARY)
             checkInterest = bool(util.GetAttrs(camera, 'interest', 'translationCurve', 'id') == itemID)
             advancedCamera = bool(gfxsettings.Get(gfxsettings.UI_ADVANCED_CAMERA))
@@ -2015,6 +2028,8 @@ class MenuSvc(service.Service):
                     menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenCargoHold'), openFunctions.OpenShipHangarCargo, [itemID]]]
                     if checkIfShipDroneBay:
                         menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenDroneBay'), openFunctions.OpenDroneBay, [itemID]]]
+                    if checkIfShipFighterBay:
+                        menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenFighterBay'), openFunctions.OpenFighterBay, [itemID]]]
                     if checkIfShipFuelBay:
                         menuEntries += [[uiutil.MenuLabel('UI/Commands/OpenFuelBay'), self.OpenFuelBay, [itemID]]]
                     if checkIfShipOreHold:
@@ -2241,7 +2256,11 @@ class MenuSvc(service.Service):
                     if reason:
                         menuEntries.reasonsWhyNotAvailable['UI/Inflight/EnterWormhole'] = reason
             menuEntries += [None]
-            if not checkWarpActive and checkLookatDist:
+            if IsNewCameraActive():
+                _checkLookAtDist = True
+            else:
+                _checkLookAtDist = checkLookatDist
+            if not checkWarpActive and _checkLookAtDist:
                 if not checkLookingAtItem and not checkPlanet and not checkMoon:
                     menuEntries += [[uiutil.MenuLabel('UI/Inflight/LookAtObject'), sm.GetService('sceneManager').GetActiveSpaceCamera().LookAt, (itemID,)]]
                 else:
@@ -2251,7 +2270,7 @@ class MenuSvc(service.Service):
                         menuEntries.reasonsWhyNotAvailable['UI/Inflight/LookAtObject'] = reason
                 if not checkLookingAtItem and advancedCamera:
                     menuEntries += [[uiutil.MenuLabel('UI/Inflight/SetAsCameraParent'), self.SetParent, (itemID,)]]
-                if not checkInterest and advancedCamera:
+                if not checkInterest and (advancedCamera or IsNewCameraActive()):
                     menuEntries += [[uiutil.MenuLabel('UI/Inflight/SetAsCameraInterest'), self.SetInterest, (itemID,)]]
             else:
                 prereqs = [('inWarp', checkWarpActive, False), ('notInLookingRange', checkLookatDist, True)]
@@ -3602,7 +3621,7 @@ class MenuSvc(service.Service):
         uicore.cmd.ExecuteCombatCommand(itemID, uiconst.UI_CLICK)
 
     def Approach(self, itemID, cancelAutoNavigation = True):
-        if itemID == session.shipid:
+        if itemID == session.shipid or sm.GetService('sensorSuite').IsSiteBall(itemID):
             return
         autoPilot = sm.GetService('autoPilot')
         if not sm.GetService('machoNet').GetGlobalConfig().get('newAutoNavigationKillSwitch', False):
@@ -3668,6 +3687,8 @@ class MenuSvc(service.Service):
         sm.GetService('info').ShowInfo(typeID, itemID, new, rec, parentID, abstractinfo=abstractInfo)
 
     def ShowInfoForItem(self, itemID):
+        if sm.GetService('sensorSuite').IsSiteBall(itemID):
+            return
         bp = sm.StartService('michelle').GetBallpark()
         if bp:
             itemTypeID = bp.GetInvItem(itemID).typeID
@@ -4011,16 +4032,16 @@ class MenuSvc(service.Service):
         sm.GetService('sceneManager').GetActiveSpaceCamera().LookAt(pickid, smooth=False)
 
     def SetInterest(self, pickid):
-        sm.GetService('sceneManager').GetActiveSpaceCamera().SetCameraInterest(pickid)
+        sm.GetService('sceneManager').GetActiveSpaceCamera().Track(pickid)
 
     def TryLookAt(self, itemID):
         return menuFunctions.TryLookAt(itemID)
 
-    def ToggleLookAt(self, itemID):
-        return menuFunctions.ToggleLookAt(itemID)
+    def ToggleLookAt(self, itemID, **kwargs):
+        return menuFunctions.ToggleLookAt(itemID, **kwargs)
 
     def SelectTarget(self, itemID):
-        pass
+        sm.GetService('state').SetState(itemID, states.multiSelected, True)
 
     def Scoop(self, objectID, typeID, password = None):
         self.GetCloseAndTryCommand(objectID, self.RealScoop, (objectID, typeID, password))
@@ -4211,6 +4232,12 @@ class MenuSvc(service.Service):
 
     def ActivateMultiTraining(self, itemID):
         return menuFunctions.ActivateMultiTraining(itemID)
+
+    def ActivateSkillExtractor(self, item):
+        return menuFunctions.ActivateSkillExtractor(item)
+
+    def ActivateSkillInjector(self, itemID, quantity):
+        return menuFunctions.ActivateSkillInjector(itemID, quantity)
 
     def ConsumeBooster(self, invItems):
         return invItemFunctions.ConsumeBooster(invItems)

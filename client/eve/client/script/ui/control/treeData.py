@@ -1,7 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\control\treeData.py
 
 
-class TreeData:
+class TreeData(object):
 
     def __init__(self, label = None, parent = None, children = None, icon = None, isRemovable = False, settings = None, **kw):
         self._label = label

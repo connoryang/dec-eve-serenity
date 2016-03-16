@@ -1,11 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\spaceCameraController.py
-import math
-from achievements.common.achievementConst import AchievementConsts
-from achievements.common.eventExceptionEater import AchievementEventExceptionEater
-from carbon.common.script.util import mathCommon
 from carbonui import const as uiconst
 from eve.client.script.ui.camera.baseCameraController import BaseCameraController
-from eve.client.script.ui.camera.dungeonEditorCamera import DungeonEditorCamera
+from eve.client.script.ui.inflight.dungeoneditor import DungeonEditor
 import evecamera
 from evecamera import FOV_MAX, FOV_MIN
 import mathUtil
@@ -13,7 +9,6 @@ import service
 import uthread
 import geo2
 import blue
-from evegraphics import settings as gfxsettings
 
 class SpaceCameraController(BaseCameraController):
     cameraID = evecamera.CAM_SPACE_PRIMARY
@@ -24,12 +19,8 @@ class SpaceCameraController(BaseCameraController):
         self.ignoreNextDblClick = False
         self.isPicked = False
         self.isRotating = False
-        self.dungeonEditorSelectionEnabled = False
         self.fovResetPending = False
         self.isDragEventScattered = False
-        self.zoomAchievementCompleted = False
-        self.rotateAchievementCompleted = False
-        self.cameraStillSpinning = False
 
     def OnMouseDown(self, *args):
         self.mouseDownPos = (uicore.uilib.x, uicore.uilib.y)
@@ -41,7 +32,7 @@ class SpaceCameraController(BaseCameraController):
                 self.isMovingSceneCursor = sm.GetService('scenario').GetPickAxis()
             if pickobject:
                 self.CheckInSceneCursorPicked(pickobject)
-                if session.role & service.ROLE_CONTENT and self.dungeonEditorSelectionEnabled and not self.isMovingSceneCursor:
+                if session.role & service.ROLE_CONTENT and DungeonEditor.IsOpen() and not self.isMovingSceneCursor:
                     self.OnDungeonEditClick(pickobject)
         if uicore.uilib.rightbtn:
             sm.GetService('target').CancelTargetOrder()
@@ -77,13 +68,6 @@ class SpaceCameraController(BaseCameraController):
                 return
             if uicore.uilib.rightbtn or uicore.uilib.mouseTravel > 6:
                 return
-            camera = self.GetCamera()
-            isFreeLook = self.IsFreeLookCamera(camera)
-            if isFreeLook:
-                picktype, pickobject = self.GetPick()
-                if pickobject:
-                    camera.LookAt(pickobject.translationCurve.id)
-                return
             self.SetShipDirection(solarsystemID)
         finally:
             uthread.UnLock(self)
@@ -108,11 +92,7 @@ class SpaceCameraController(BaseCameraController):
                             if what.args[0] != 'MonikerSessionCheckFailure':
                                 raise what
 
-    def IsFreeLookCamera(self, camera):
-        return isinstance(camera, DungeonEditorCamera) and camera.dungeonHack.IsFreeLook()
-
     def OnMouseUp(self, button, *args):
-        self.mouseDownPos = None
         sm.ScatterEvent('OnCameraDragEnd')
         self.isDragEventScattered = False
         if not (uicore.uilib.leftbtn or uicore.uilib.rightbtn):
@@ -128,12 +108,12 @@ class SpaceCameraController(BaseCameraController):
         if button == 0 and not uicore.uilib.rightbtn:
             self.cameraStillSpinning = False
             camera = self.GetCamera()
-            freeLookMove = self.IsFreeLookCamera(camera) and uicore.uilib.Key(uiconst.VK_MENU)
             mt = self.GetMouseTravel()
-            if not (mt and mt > 5 or freeLookMove):
+            if not (mt and mt > 5):
                 if not self.TryClickSceneObject():
                     if uicore.uilib.Key(uiconst.VK_MENU):
                         sm.GetService('menu').TryLookAt(session.shipid)
+        self.mouseDownPos = None
         if self.CheckReleaseSceneCursor():
             return
         if session.role & service.ROLE_CONTENT:
@@ -160,9 +140,6 @@ class SpaceCameraController(BaseCameraController):
         camera = self.GetCamera()
         fov = camera.fieldOfView
         if self.CheckMoveSceneCursor():
-            return
-        if uicore.uilib.Key(uiconst.VK_MENU) and self.IsFreeLookCamera(camera):
-            self.MoveDungeonCamera()
             return
         if rightbtn and not leftbtn:
             camera.RotateOnOrbit(-dx * fov * 0.2, dy * fov * 0.2)
@@ -219,22 +196,6 @@ class SpaceCameraController(BaseCameraController):
             return True
         return False
 
-    def MoveDungeonCamera(self):
-        camera = self.GetCamera()
-        lib = uicore.uilib
-        leftBtn = lib.leftbtn and not lib.rightbtn and not lib.midbtn
-        rightBtn = lib.rightbtn and not lib.leftbtn and not lib.midbtn
-        midBtn = lib.rightbtn and lib.leftbtn or lib.midbtn
-        if leftBtn:
-            camera.OrbitParent(-lib.dx * camera.fieldOfView * 0.2, -lib.dy * camera.fieldOfView * 0.2)
-        if rightBtn:
-            modifier = uicore.mouseInputHandler.GetCameraZoomModifier()
-            camera.PanCameraBy(modifier * -0.01 * lib.dy, time=0)
-        if midBtn:
-            vertMovement = geo2.Vec3Scale(camera.upVec, lib.dy * camera.translationFromParent / uicore.uilib.desktop.height)
-            horizMovement = geo2.Vec3Scale(camera.rightVec, -lib.dx * camera.translationFromParent / uicore.uilib.desktop.height)
-            camera.dungeonHack._ChangeCamPos(geo2.Vec3Add(vertMovement, horizMovement))
-
     def ResetFov(self):
         if self.fovCached is not None:
             camera = self.GetCamera()
@@ -250,49 +211,3 @@ class SpaceCameraController(BaseCameraController):
 
             self.fovCached = None
         self.fovResetPending = False
-
-    def RecordZoomForAchievements(self, amount):
-        with AchievementEventExceptionEater():
-            if self.zoomAchievementCompleted:
-                return
-            isCompleted = sm.GetService('achievementSvc').IsAchievementCompleted(AchievementConsts.UI_ZOOM_IN_SPACE)
-            if isCompleted:
-                self.zoomAchievementCompleted = True
-            else:
-                sm.ScatterEvent('OnClientMouseZoomInSpace', amount)
-
-    def CameraMove_thread(self):
-        try:
-            camera = self.GetCamera()
-            lastYawRad, _, _ = geo2.QuaternionRotationGetYawPitchRoll(camera.rotationAroundParent)
-            radDelta = 0
-            while self.cameraStillSpinning:
-                blue.pyos.synchro.Yield()
-                if self.mouseDownPos is None or camera is None:
-                    self.cameraStillSpinning = False
-                    return
-                curYaw, pitch, roll = geo2.QuaternionRotationGetYawPitchRoll(camera.rotationAroundParent)
-                angleBtwYaws = mathCommon.GetLesserAngleBetweenYaws(lastYawRad, curYaw)
-                radDelta += angleBtwYaws
-                lastYawRad = curYaw
-                if abs(radDelta) > math.pi / 2:
-                    sm.ScatterEvent('OnClientMouseSpinInSpace')
-                    return
-
-        except Exception as e:
-            pass
-
-    def RecordOrbitForAchievements(self):
-        with AchievementEventExceptionEater():
-            if self.rotateAchievementCompleted or self.cameraStillSpinning:
-                return
-            isCompleted = sm.GetService('achievementSvc').IsAchievementCompleted(AchievementConsts.UI_ROTATE_IN_SPACE)
-            if isCompleted:
-                self.rotateAchievementCompleted = True
-            else:
-                self.cameraStillSpinning = True
-                uthread.new(self.CameraMove_thread)
-
-    def ResetAchievementVariables(self):
-        self.zoomAchievementCompleted = False
-        self.rotateAchievementCompleted = False

@@ -1,5 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\assetsSearch.py
-from eveAssets.assetSearchUtil import ParseString
+from eveAssets.assetSearchUtil import IsPartOfText, IsTextMatch, ParseString
 import uiprimitives
 import uicontrols
 import carbonui.const as uiconst
@@ -73,13 +73,12 @@ class SearchBox(uicontrols.SinglelineEdit):
             strippedText, lastWord = self.SplitText(trimmedText, removeSeprator=False)
             freeText, matches = ParseString(trimmedText)
             if lastWord:
-                if matches and lastWord == matches[-1][1].lower():
+                if matches and IsTextMatch(lastWord, matches[-1][1]):
                     keyword, value = matches[-1]
                     for kw in self.IterMatchingKeywords(keyword):
-                        value = value.lower()
                         if kw.specialOptions:
                             for option in kw.specialOptions:
-                                if option.startswith(value):
+                                if IsPartOfText(option, value):
                                     hints.append((localization.GetByLabel('UI/Inventory/AssetSearch/OptionHint', keyword=kw.keyword, option=option), '%s%s %s' % (strippedText, option, tailText)))
 
                             break
@@ -91,9 +90,8 @@ class SearchBox(uicontrols.SinglelineEdit):
         return hints
 
     def IterMatchingKeywords(self, keyword):
-        keyword = keyword.lower()
         for kw in self.searchKeywords:
-            if kw.keyword.startswith(keyword):
+            if IsPartOfText(kw.keyword, keyword):
                 yield kw
 
     def SplitText(self, baseText, removeSeprator = False):

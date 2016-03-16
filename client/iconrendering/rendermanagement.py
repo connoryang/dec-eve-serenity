@@ -110,6 +110,10 @@ class RenderManager(object):
     def _RenderSingle(self, sizes, resPath = None, dnaString = None):
         graphicIDs = self.resmapper.GetGraphicIdsForGraphicFile(resPath)
         graphicIDs += self.resmapper.GetGraphicIdsForSOFData(dnaString)
+        if len(graphicIDs) == 0:
+            self.logger.warn('No graphicIDs found for resPath: "%s" and dnaString: "%s"' % (resPath, dnaString))
+            self.logger.warn('No icons generated')
+            return
         blueprintIDs = self.GetBlueprintGraphicIDs()
         for vals in rendersetup.YieldAllRenderFuncsAndArgsForGraphics(self.resmapper, self.outdir, self.logger, blueprintIDs, graphicIDs=graphicIDs):
             if vals is None:

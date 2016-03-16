@@ -14,6 +14,7 @@ from eve.client.script.ui.shared.mapView.layout.mapLayoutHandler import MapViewL
 from eve.client.script.ui.shared.mapView.mapViewBookmarkHandler import MapViewBookmarkHandler
 from eve.client.script.ui.shared.mapView.mapViewData import mapViewData
 from eve.client.script.ui.shared.mapView.mapViewNavigation import MapViewNavigation
+from eve.client.script.ui.shared.mapView.mapViewUtil import ScaleSolarSystemValue
 from eve.client.script.ui.shared.mapView.markers.mapMarkerMyHome import MarkerMyHome
 from eve.client.script.ui.shared.mapView.markers.mapMarkerMyLocation import MarkerMyLocation
 from eve.client.script.ui.shared.mapView.markers.mapMarkersHandler import MapViewMarkersHandler
@@ -33,7 +34,7 @@ import nodemanager
 from carbonui.control.menuLabel import MenuLabel
 from carbonui.primitives.container import Container
 import eve.client.script.ui.shared.mapView.mapViewColorHandler as colorHandler
-from eve.client.script.ui.shared.mapView.mapViewConst import VIEWMODE_COLOR_SETTINGS, VIEWMODE_LAYOUT_SETTINGS, VIEWMODE_LAYOUT_REGIONS, VIEWMODE_LAYOUT_CONSTELLATIONS, VIEWMODE_LAYOUT_SHOW_ABSTRACT_SETTINGS, VIEWMODE_LINES_SETTINGS, VIEWMODE_LINES_NONE, VIEWMODE_LINES_ALL, VIEWMODE_LINES_SELECTION_REGION_NEIGHBOURS, VIEWMODE_LINES_SELECTION_REGION, VIEWMODE_LINES_SHOW_ALLIANCE_SETTINGS, MARKERID_MYPOS, MARKERID_SOLARSYSTEM_CELESTIAL, MARKERID_MYHOME, VIEWMODE_MARKERS_SETTINGS, JUMPBRIDGE_COLOR, VIEWMODE_FOCUS_SELF, MAPVIEW_OVERLAY_PADDING_FULLSCREEN, MAPVIEW_OVERLAY_PADDING_NONFULLSCREEN, UNIVERSE_SCALE, JUMPBRIDGE_TYPE, SETTING_PREFIX, STAR_SIZE, MAPVIEW_PRIMARY_OVERLAY_ID
+from eve.client.script.ui.shared.mapView.mapViewConst import VIEWMODE_COLOR_SETTINGS, VIEWMODE_LAYOUT_SETTINGS, VIEWMODE_LAYOUT_REGIONS, VIEWMODE_LAYOUT_CONSTELLATIONS, VIEWMODE_LAYOUT_SHOW_ABSTRACT_SETTINGS, VIEWMODE_LINES_SETTINGS, VIEWMODE_LINES_NONE, VIEWMODE_LINES_ALL, VIEWMODE_LINES_SELECTION_REGION_NEIGHBOURS, VIEWMODE_LINES_SELECTION_REGION, VIEWMODE_LINES_SHOW_ALLIANCE_SETTINGS, MARKERID_MYPOS, MARKERID_SOLARSYSTEM_CELESTIAL, MARKERID_MYHOME, VIEWMODE_MARKERS_SETTINGS, JUMPBRIDGE_COLOR, VIEWMODE_FOCUS_SELF, UNIVERSE_SCALE, JUMPBRIDGE_TYPE, SETTING_PREFIX, STAR_SIZE, MAPVIEW_PRIMARY_OVERLAY_ID
 import eve.client.script.ui.shared.maps.mapcommon as mapcommon
 from eve.common.script.sys.eveCfg import IsSolarSystem, IsConstellation, IsRegion, GetActiveShip
 import geo2
@@ -71,13 +72,12 @@ class MapView(Container):
     extraLineMapping = None
     dirtyLineIDs = set()
     inFocus = False
-    solarSystemStandalone = None
-    overlayContainer = None
     isFullScreen = False
     currentSolarsystem = None
     hilightID = None
     jumpRouteHighlightID = None
     mapViewID = None
+    jumpDriveTransform = None
     showDebugInfo = False
 
     def ApplyAttributes(self, attributes):
@@ -164,20 +164,14 @@ class MapView(Container):
 
     def OnDockModeChanged(self, isFullScreen):
         self.isFullScreen = isFullScreen
-        if self.overlayContentFrame and not self.overlayContentFrame.destroyed:
-            if isFullScreen:
-                self.overlayContentFrame.padding = MAPVIEW_OVERLAY_PADDING_FULLSCREEN
-            else:
-                self.overlayContentFrame.padding = MAPVIEW_OVERLAY_PADDING_NONFULLSCREEN
 
     def OnMapViewSettingChanged(self, settingKey, settingValue, *args, **kwds):
-        if self.solarSystemStandalone:
-            if settingKey == VIEWMODE_MARKERS_SETTINGS:
-                SetMapViewSetting(VIEWMODE_MARKERS_SETTINGS, settingValue, MAPVIEW_PRIMARY_OVERLAY_ID)
-            self.solarSystemStandalone.OnMapViewSettingChanged(settingKey, settingValue, *args, **kwds)
         if settingKey == VIEWMODE_FOCUS_SELF:
             self.EnableAutoFocus()
-            self.SetActiveState(primaryItemID=session.solarsystemid2, localID=(MARKERID_MYPOS, session.charid), zoomToItem=False)
+            if IsWormholeSystem(session.solarsystemid2):
+                mapViewUtil.OpenSolarSystemMap()
+            else:
+                self.SetActiveState(primaryItemID=session.solarsystemid2, localID=(MARKERID_MYPOS, session.charid), zoomToItem=False)
             return
         if settingKey == VIEWMODE_MARKERS_SETTINGS:
             if self.currentSolarsystem:
@@ -189,32 +183,6 @@ class MapView(Container):
             mapViewUtil.LogColorModeUsage(useCase='change')
         self.UpdateMapLayout()
 
-    def LoadOverlaySolarSystemMap(self, solarSystemID):
-        settings.char.ui.Set('%s_overlayActiveState_%s' % (SETTING_PREFIX, self.mapViewID), solarSystemID)
-        if self.solarSystemStandalone and not self.solarSystemStandalone.destroyed:
-            if self.solarSystemStandalone.solarSystemID != solarSystemID:
-                self.solarSystemStandalone.LoadSolarSystemDetails(solarSystemID)
-                self.solarSystemStandalone.FrameSolarSystem()
-            return
-        overlayContainer = Container(parent=self, state=uiconst.UI_NORMAL, idx=0)
-        fadeFill = Fill(bgParent=overlayContainer, color=(0, 0, 0, 0))
-        uicore.animations.FadeTo(fadeFill, startVal=0.0, endVal=0.75, duration=1.0)
-        self.overlayContainer = overlayContainer
-        if self.isFullScreen:
-            padding = MAPVIEW_OVERLAY_PADDING_FULLSCREEN
-            self.sceneContainer.renderJob.enabled = False
-        else:
-            padding = MAPVIEW_OVERLAY_PADDING_NONFULLSCREEN
-            self.sceneContainer.renderJob.enabled = True
-        contentFrame = DockablePanelContentFrame(parent=overlayContainer, padding=padding)
-        markerSettings = GetMapViewSetting(VIEWMODE_MARKERS_SETTINGS, self.mapViewID)
-        SetMapViewSetting(VIEWMODE_MARKERS_SETTINGS, markerSettings, MAPVIEW_PRIMARY_OVERLAY_ID)
-        self.solarSystemStandalone = MapViewSolarSystem(parent=contentFrame.content, showCloseButton=True, showInfobox=True, closeFunction=self.CloseOverlayContainer, mapViewID=MAPVIEW_PRIMARY_OVERLAY_ID)
-        contentFrame.AnimateContentIn(animationOffset=0.1)
-        self.solarSystemStandalone.LoadSolarSystemDetails(solarSystemID)
-        self.solarSystemStandalone.FrameSolarSystem()
-        self.overlayContentFrame = contentFrame
-
     def UpdateMapLayout(self):
         self.UpdateMapViewColorMode()
         if self.destroyed:
@@ -224,33 +192,17 @@ class MapView(Container):
         if currentViewModeGroup != self.mapMode or currentAbstract != self.abstractMode:
             self.mapMode = currentViewModeGroup
             self.abstractMode = currentAbstract
+            self.ShowMyLocation()
             self.RefreshActiveState()
         currentLineMode = GetMapViewSetting(VIEWMODE_LINES_SETTINGS, self.mapViewID)
         if currentLineMode != self.lineMode:
             self.UpdateLines(hint='OnMapViewSettingChanged')
-
-    def CloseOverlayContainer(self, *args, **kwds):
-        self.sceneContainer.renderJob.enabled = True
-        if self.overlayContainer and not self.overlayContainer.destroyed:
-            self.overlayContainer.Close()
-        self.solarSystemStandalone = None
-        self.overlayContainer = None
-        settings.char.ui.Set('%s_overlayActiveState_%s' % (SETTING_PREFIX, self.mapViewID), None)
 
     def InitMap(self, interestID = None):
         if self.destroyed:
             return
         self.LogInfo('MapView: InitMap')
         scene = trinity.EveSpaceScene()
-        scene.starfield = trinity.Load('res:/dx9/scene/starfield/spritestars.red')
-        scene.backgroundEffect = trinity.Load('res:/dx9/scene/starfield/starfieldNebula.red')
-        scene.backgroundRenderingEnabled = True
-        node = nodemanager.FindNode(scene.backgroundEffect.resources, 'NebulaMap', 'trinity.TriTextureParameter')
-        if node is not None:
-            node.resourcePath = 'res:/UI/Texture/classes/MapView/backdrop_cube.dds'
-        node = nodemanager.FindNode(scene.backgroundEffect.resources, 'StarMap', 'trinity.TriTextureParameter')
-        if node is not None:
-            node.resourcePath = 'res:/dx9/scene/starfield/Stars01_Tile2_dim.dds'
         self.sceneContainer.scene = scene
         self.sceneContainer.DisplaySpaceScene()
         self.mapRoot = trinity.EveRootTransform()
@@ -368,31 +320,6 @@ class MapView(Container):
         m += sm.GetService('menu').CelestialMenu(itemID, noTrace=1, mapItem=item, filterFunc=filterFunc)
         return m
 
-    def ShowJumpDriveRange(self):
-        if getattr(self, 'mylocation', None):
-            for each in self.mylocation.trackerTransform.children[:]:
-                if each.name == 'jumpDriveRange':
-                    self.mylocation.trackerTransform.children.remove(each)
-
-        else:
-            return
-        if session.regionid > const.mapWormholeRegionMin:
-            return
-        shipID = GetActiveShip()
-        if shipID is None:
-            return
-        dogmaLM = sm.GetService('clientDogmaIM').GetDogmaLocation()
-        driveRange = dogmaLM.GetAttributeValue(shipID, const.attributeJumpDriveRange)
-        if driveRange is None or driveRange == 0:
-            return
-        scale = 2.0 * driveRange * const.LIGHTYEAR * UNIVERSE_SCALE
-        sphere = trinity.Load('res:/dx9/model/UI/JumpRangeBubble.red')
-        sphere.scaling = (scale, scale, scale)
-        sphere.name = 'jumpDriveRange'
-        if self.abstractMode():
-            sphere.display = False
-        self.mylocation.trackerTransform.children.append(sphere)
-
     def ShowMyHomeStation(self):
         if self.destroyed:
             return
@@ -431,6 +358,7 @@ class MapView(Container):
         except:
             pass
 
+        markerObject = None
         if not IsWormholeRegion(session.regionid):
             mapNode = self.layoutHandler.GetNodeBySolarSystemID(session.solarsystemid2)
             solarSystemPosition = mapNode.position
@@ -449,6 +377,31 @@ class MapView(Container):
                     localPosition = (0.0, 0.0, 0.0)
                 markerObject = self.markersHandler.AddSolarSystemBasedMarker(markerID, MarkerMyLocation, trackObjectID=session.shipid or session.stationid, solarSystemID=session.solarsystemid2, mapPositionLocal=localPosition, mapPositionSolarSystem=solarSystemPosition)
             self.markersAlwaysVisible.add(markerID)
+        self.ShowJumpDriveRange(markerObject)
+
+    def ShowJumpDriveRange(self, markerObject):
+        if self.jumpDriveTransform:
+            if self.jumpDriveTransform in self.mapRoot.children:
+                self.mapRoot.children.remove(self.jumpDriveTransform)
+        if session.regionid > const.mapWormholeRegionMin:
+            return
+        if markerObject is None:
+            return
+        if self.abstractMode:
+            return
+        if session.shipid is None:
+            return
+        dogmaLM = sm.GetService('clientDogmaIM').GetDogmaLocation()
+        driveRange = dogmaLM.GetAttributeValue(session.shipid, const.attributeJumpDriveRange)
+        if driveRange is None or driveRange == 0:
+            return
+        scale = 2.0 * driveRange * const.LIGHTYEAR * UNIVERSE_SCALE
+        sphere = trinity.Load('res:/dx9/model/UI/JumpRangeBubble.red')
+        sphere.scaling = (scale, scale, scale)
+        sphere.name = 'jumpDriveRange'
+        self.mapRoot.children.append(sphere)
+        markerObject.RegisterTrackingTransform(sphere)
+        self.jumpDriveTransform = sphere
 
     def IsFlat(self):
         return self.abstractMode
@@ -575,7 +528,7 @@ class MapView(Container):
          0,
          0)
         self.distanceRangeLines.value = (cameraDistance,
-         fadeOutFar,
+         fadeOutFar * 100,
          0,
          0)
         if self.markersHandler:
@@ -611,6 +564,8 @@ class MapView(Container):
                 self.markersHandler.HilightMarkers([hilightID])
             else:
                 self.markersHandler.HilightMarkers([])
+        elif not itemID and self.markersHandler.hilightMarkers:
+            self.markersHandler.HilightMarkers([])
 
     def SetCameraPointOfInterestSolarSystemPosition(self, solarSystemID, position):
         mapInfo = mapViewData.GetKnownSolarSystem(solarSystemID)
@@ -656,13 +611,7 @@ class MapView(Container):
             primaryItemID = session.solarsystemid2
         itemID = primaryItemID
         if IsWormholeSystem(itemID):
-            if self.solarSystemStandalone and not self.solarSystemStandalone.destroyed:
-                if self.solarSystemStandalone.solarSystemID == itemID:
-                    self.CloseOverlayContainer()
-                    return
-            self.LoadOverlaySolarSystemMap(itemID)
             return
-        self.CloseOverlayContainer()
         if IsWormholeConstellation(itemID):
             return
         if IsWormholeRegion(itemID):
@@ -695,7 +644,6 @@ class MapView(Container):
         self.jumpRouteHighlightID = None
         if IsSolarSystem(itemID):
             self.jumpRouteHighlightID = itemID
-            mapNode = self.layoutHandler.GetNodeBySolarSystemID(itemID)
             mapData = mapViewData.GetKnownSolarSystem(itemID)
             self.LoadSolarSystemDetails(itemID)
             radius = mapViewUtil.ScaleSolarSystemValue(self.currentSolarsystem.solarSystemRadius)
@@ -703,6 +651,8 @@ class MapView(Container):
             minCameraDistanceFromInterest = mapViewConst.MIN_CAMERA_DISTANCE
             sm.GetService('audio').SendUIEvent('map_system_zoom_play')
             activeMarkers.append(itemID)
+            constellationMapData = mapViewData.GetKnownConstellation(mapData.constellationID)
+            activeMarkers += mapData.neighbours
             activeObjects.solarSystemID = itemID
             activeObjects.constellationID = mapData.constellationID
             activeObjects.regionID = mapData.regionID
@@ -716,15 +666,19 @@ class MapView(Container):
             sm.GetService('audio').SendUIEvent('map_constellation_zoom_play')
             activeObjects.constellationID = itemID
             activeObjects.regionID = mapData.regionID
+            activeMarkers += mapData.solarSystemIDs
+            activeMarkers.append(itemID)
         elif IsRegion(itemID):
-            mapInfo = mapViewData.GetKnownRegion(itemID)
+            mapData = mapViewData.GetKnownRegion(itemID)
             self.CloseCurrentSolarSystemIfAny()
-            positions = [ self.layoutHandler.GetNodeBySolarSystemID(solarSystemID).position for solarSystemID in mapInfo.solarSystemIDs ]
+            positions = [ self.layoutHandler.GetNodeBySolarSystemID(solarSystemID).position for solarSystemID in mapData.solarSystemIDs ]
             cameraPointOfInterest, radius = mapViewUtil.GetBoundingSphereRadiusCenter(positions, self.abstractMode)
             cameraDistanceFromInterest = mapViewUtil.GetTranslationFromParentWithRadius(radius, self.camera)
             minCameraDistanceFromInterest = cameraDistanceFromInterest * 0.25
             sm.GetService('audio').SendUIEvent('map_region_zoom_play')
             activeObjects.regionID = itemID
+            activeMarkers += mapData.constellationIDs
+            activeMarkers.append(itemID)
         elif mapViewUtil.IsLandmark(itemID):
             lm = self.mapSvc.GetLandmark(itemID * -1)
             cameraPointOfInterest = mapViewUtil.WorldPosToMapPos(lm.position)
@@ -1260,5 +1214,3 @@ class MapView(Container):
     def UpdateViewPort(self):
         if self.sceneContainer:
             self.sceneContainer.UpdateViewPort()
-        if self.solarSystemStandalone:
-            self.solarSystemStandalone.UpdateViewPort()

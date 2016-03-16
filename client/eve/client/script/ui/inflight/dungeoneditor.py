@@ -1,8 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\inflight\dungeoneditor.py
+from eve.client.script.parklife import states
 from eve.client.script.parklife.dungeonHelper import IsJessicaOpen
-from eve.client.script.ui.camera.dungeonEditorCamera import DungeonEditorCamera
 from eve.client.script.ui.control.eveWindow import Window
 import evecamera
+from evecamera.dungeonhack import DungeonHack
 import evetypes
 import uicontrols
 import copy
@@ -41,15 +42,13 @@ class DungeonEditor(Window):
      'OnSelectObject',
      'OnDungeonEdit',
      'OnDungeonSelectionGroupRotation',
-     'OnBSDTablesChanged']
+     'OnBSDTablesChanged',
+     'OnStateChange']
     default_windowID = 'dungeoneditor'
 
     def ApplyAttributes(self, attributes):
         Window.ApplyAttributes(self, attributes)
-        camera = DungeonEditorCamera()
-        self._navigation = camera.dungeonHack
-        sm.GetService('sceneManager').RegisterCamera(camera)
-        sm.GetService('sceneManager').SetActiveCamera(camera)
+        self._navigation = DungeonHack()
         self.loadedTab = None
         self.roomTabSelected = 'Objects'
         self.loadingThread = None
@@ -70,10 +69,10 @@ class DungeonEditor(Window):
             self.cache = sm.GetService('cache')
         else:
             self.cache = sm.RemoteSvc('cache')
-        self.hidePlacementGrid = settings.user.ui.Get('hidePlacementGrid', 0)
-        uicore.layer.inflight.dungeonEditorSelectionEnabled = True
         self.oldRadialMenuTime = settings.user.ui.Get('actionMenuExpandTime', 150)
         settings.user.ui.Set('actionMenuExpandTime', 5000)
+        if IsNewCameraActive():
+            sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_TACTICAL)
 
     def LoadPanels(self):
         panel = uiprimitives.Container(name='panel', parent=self.sr.main, left=const.defaultPadding, top=const.defaultPadding, width=const.defaultPadding, height=const.defaultPadding)
@@ -126,12 +125,17 @@ class DungeonEditor(Window):
             self.loadedTab = tabid
             self.loadingThread = uthread.new(getattr(self, tabName))
             self.loadingThread.context = 'DungeonEditor::%s' % tabName
-            if tabid != 'PaletteTab':
-                self._navigation.SetGridState(not self.hidePlacementGrid)
-                self._navigation.SetDrawAxis(not self.hidePlacementGrid)
-            else:
-                self._navigation.SetGridState(True)
-                self._navigation.SetDrawAxis(True)
+
+    def UpdateGridVisibility(self):
+        if self.loadedTab == 'PaletteTab':
+            self._navigation.SetGridState(True)
+            self._navigation.SetDrawAxis(True)
+        else:
+            showGrid = self.gridCheckbox.GetValue()
+            self._navigation.SetGridState(showGrid)
+            self._navigation.SetDrawAxis(showGrid)
+        self._navigation.SetGridSpacing(self.gridSpacingDropdown.GetValue())
+        self._navigation.SetGridLength(self.gridSizeDropdown.GetValue())
 
     def IsTabLoaded(self, tabId):
         return tabId == self.loadedTab
@@ -276,7 +280,6 @@ class DungeonEditor(Window):
         sm.GetService('scenario').ResetDungeon()
 
     def PlayDungeon(self, *args):
-        self._navigation.SetFreeLook(False)
         dungeonID = settings.user.ui.Get('dungeonDungeon', None)
         if dungeonID is None or dungeonID == 'All':
             return
@@ -488,7 +491,14 @@ class DungeonEditor(Window):
         amount = self.duplicateAmount.GetValue()
         sm.StartService('scenario').DuplicateSelection(amount, X, Y, Z)
 
+    def OnStateChange(self, itemID, flag, flagState, *args):
+        if flag == states.selected and flagState:
+            dunObjectID = sm.GetService('michelle').GetItem(itemID).dunObjectID
+            if dunObjectID:
+                sm.GetService('scenario').SetSelectionByID([dunObjectID])
+
     def OnObjectClicked(self, entry, *args):
+        uicore.cmd.ExecuteCombatCommand(entry.sr.node.itemID, uiconst.UI_CLICK)
         if self.sr.objscrollbox:
             ids = self.GetCurrentlySelectedObjects()
             sm.StartService('scenario').SetSelectionByID(ids)
@@ -758,10 +768,7 @@ class DungeonEditor(Window):
 
     def Close(self, *args, **kwds):
         Window.Close(self, *args, **kwds)
-        sceneMan = sm.GetService('sceneManager')
-        sceneMan.UnregisterCamera(evecamera.CAM_DUNGEONEDIT)
-        camera = sceneMan.GetRegisteredCamera(evecamera.CAM_SPACE_PRIMARY)
-        sceneMan.SetActiveCamera(camera)
+        self._navigation.RemoveAxisLines()
 
     def GetSelectedObjectsMinMaxRadius(self):
         minRadius = 1
@@ -1080,36 +1087,22 @@ class DungeonEditor(Window):
         self.aggrSettings = uicontrols.Checkbox(text='Aggression radius', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=settings.user.ui.Get('showAggrRadius', 0), callback=self.OnDisplaySettingsChange)
         self.aggrSettingsAll = uicontrols.Checkbox(text='Show agression radius of all objects', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=settings.user.ui.Get('aggrSettingsAll', 0), callback=self.OnDisplaySettingsChange)
         uiprimitives.Line(parent=self.sr.panel, align=uiconst.TOTOP)
-        uiprimitives.Container(name='pusher', align=uiconst.TOTOP, height=7, parent=self.sr.panel)
-        self.freeLookCheckbox = uicontrols.Checkbox(text='Free Look Camera', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=self._navigation.IsFreeLook(), callback=self.OnDisplaySettingsChange)
-        uicontrols.EveLabelMedium(text='Free Look Camera Controls', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' CTRL + WASD - Moves forward, left, backwards, and right', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' CTRL + RF - Moves up and down', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' ALT + Left Mouse Button - Rotate camera around focus point', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' ALT + Middle Mouse Button - Moves camera focus point in screen space.', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' ALT + Right Mouse Button - Zooms camera in and out of focus point', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' Double Click on Object - Changes focus point to that object.', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uicontrols.EveLabelMedium(text=' Can also use "Look At" to set the focus point to an object.', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        uiprimitives.Line(parent=self.sr.panel, align=uiconst.TOTOP)
-        self.axisCheckbox = uicontrols.Checkbox(text='Draw Axis Lines', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=self._navigation.IsDrawingAxis(), callback=self.OnDisplaySettingsChange)
         self.gridCheckbox = uicontrols.Checkbox(text='Draw Grid Lines', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=self._navigation.IsGridEnabled(), callback=self.OnDisplaySettingsChange)
         uiprimitives.Container(name='pusher', align=uiconst.TOTOP, height=7, parent=self.sr.panel)
         uicontrols.EveLabelMedium(text='Palette Placement Grid', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
-        gridSizeOptions = [('20x20m', 20.0),
-         ('200x200m', 200.0),
+        gridSizeOptions = [('200x200m', 200.0),
          ('2x2km', 2000.0),
          ('20x20km', 20000.0),
-         ('200x200km', 200000.0)]
+         ('200x200km', 200000.0),
+         ('2000x2000km', 2000000.0)]
         uiprimitives.Container(name='pusher', align=uiconst.TOTOP, height=14, parent=self.sr.panel)
         self.gridSizeDropdown = uicontrols.Combo(parent=self.sr.panel, label='Grid Size', options=gridSizeOptions, name='', select=self._navigation.GetGridLength(), callback=self.OnDisplaySettingsChange, align=uiconst.TOTOP, adjustWidth=True)
-        gridSpacingOptions = [('1x1m', 1.0),
-         ('10x10m', 10.0),
+        gridSpacingOptions = [('10x10m', 10.0),
          ('100x100m', 100.0),
          ('1x1km', 1000.0),
          ('10x10km', 10000.0)]
         uiprimitives.Container(name='pusher', align=uiconst.TOTOP, height=14, parent=self.sr.panel)
         self.gridSpacingDropdown = uicontrols.Combo(parent=self.sr.panel, label='Unit Size', options=gridSpacingOptions, name='', select=self._navigation.GetGridSpacing(), callback=self.OnDisplaySettingsChange, align=uiconst.TOTOP, adjustWidth=True)
-        self.gridCheckbox = uicontrols.Checkbox(text='Hide Placement Grid when not in Palette View', parent=self.sr.panel, configName=checkbox1ID, retval=None, checked=settings.user.ui.Get('hidePlacementGrid', 0), callback=self.OnDisplaySettingsChange)
         uiprimitives.Container(name='pusher', align=uiconst.TOTOP, height=14, parent=self.sr.panel)
         uicontrols.EveLabelMedium(text='Free Look Camera must be enabled to use the placement grid.', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
         uicontrols.EveLabelMedium(text='Red Axis Line = X Axis', parent=self.sr.panel, align=uiconst.TOTOP, state=uiconst.UI_NORMAL)
@@ -1120,13 +1113,7 @@ class DungeonEditor(Window):
         desiredSpacingValue = self.gridSpacingDropdown.GetValue()
         settings.user.ui.Set('showAggrRadius', self.aggrSettings.GetValue())
         settings.user.ui.Set('aggrSettingsAll', self.aggrSettingsAll.GetValue())
-        self._navigation.SetFreeLook(self.freeLookCheckbox.GetValue())
-        settings.user.ui.Set('hidePlacementGrid', self.gridCheckbox.GetValue())
-        self.hidePlacementGrid = self.gridCheckbox.GetValue()
-        self._navigation.SetGridState(not self.hidePlacementGrid)
-        self._navigation.SetDrawAxis(not self.hidePlacementGrid)
-        self._navigation.SetGridSpacing(self.gridSpacingDropdown.GetValue())
-        self._navigation.SetGridLength(self.gridSizeDropdown.GetValue())
+        self.UpdateGridVisibility()
         if desiredSpacingValue != self._navigation.GetGridSpacing():
             self.gridSpacingDropdown.SetValue(self._navigation.GetGridSpacing())
         sm.GetService('scenario').RefreshSelection()
@@ -1306,9 +1293,7 @@ class DungeonEditor(Window):
 
     def _OnClose(self, *args):
         settings.user.ui.Set('actionMenuExpandTime', self.oldRadialMenuTime)
-        uicore.layer.inflight.dungeonEditorSelectionEnabled = False
         self.scenario.ClearSelection()
-        self._navigation.SetFreeLook(False)
 
 
 class DungeonDragEntry(listentry.Generic):

@@ -37,8 +37,14 @@ def Initialize():
         platform = 'Win'
         if blue.sysinfo.isTransgaming:
             platform = 'Mac'
+            tags.append('Cider')
         elif blue.sysinfo.isWine:
-            platform = 'Linux'
+            tags.append('Wine')
+            host = blue.sysinfo.wineHostOs
+            if host.startswith('Darwin'):
+                platform = 'Mac'
+            else:
+                platform = 'Linux'
         tags.append(platform)
         osVersion = '%d.%d.%d' % (blue.sysinfo.os.majorVersion, blue.sysinfo.os.minorVersion, blue.sysinfo.os.buildNumber)
         tags.append(osVersion)

@@ -2,22 +2,30 @@
 import random
 import geo2
 import blue
+from dogma.const import attributeDamageDelayDuration
 import trinity
 import uthread
 import log
-from eve.client.script.environment.effects.GenericEffect import StretchEffect, GetBoundingBox, GenericEffect, STOP_REASON_DEFAULT
+from eve.client.script.environment.effects.GenericEffect import StretchEffect, GetBoundingBox, STOP_REASON_DEFAULT
 effectData = {'effects.SuperWeaponCaldari': {'count': 32,
                                 'maxDelay': 2600,
                                 'delayUntilShipHit': 10000},
  'effects.SuperWeaponMinmatar': {'count': 32,
-                                 'maxDelay': 3000,
-                                 'delayUntilShipHit': 1000},
+                                 'maxDelay': 4000,
+                                 'delayUntilShipHit': 1000,
+                                 'delayBeforeEffect': 3000},
  'effects.SuperWeaponAmarr': {'count': 1,
                               'maxDelay': 0,
                               'delayUntilShipHit': 6208},
  'effects.SuperWeaponGallente': {'count': 1,
                                  'maxDelay': 0,
-                                 'delayUntilShipHit': 4833}}
+                                 'delayUntilShipHit': 4833},
+ 'effects.TurboLaser': {'count': 1,
+                        'maxDelay': 0,
+                        'delayUntilShipHit': 2500,
+                        'impactMassFraction': 0.5,
+                        'startLocation': trinity.EveLocalPositionBehavior.nearestBounds,
+                        'destLocation': trinity.EveLocalPositionBehavior.nearestBounds}}
 
 class SuperWeapon(StretchEffect):
     scene = trinity.device.scene
@@ -28,6 +36,15 @@ class SuperWeapon(StretchEffect):
         self.projectileCount = data['count']
         self.maxDelay = data['maxDelay']
         self.delayUntilShipHit = data['delayUntilShipHit']
+        self.delayBeforeEffect = data.get('delayBeforeEffect', 0)
+        self.delayUntilDamageApplied = self.fxSequencer.GetTypeAttribute(trigger.moduleTypeID, attributeDamageDelayDuration)
+        self.impactMassFraction = data.get('impactMassFraction', 1.0)
+        self.startLocation = data.get('startLocation', trinity.EveLocalPositionBehavior.damageLocator)
+        self.destLocation = data.get('destLocation', trinity.EveLocalPositionBehavior.damageLocator)
+
+    def IsTargetStillValid(self):
+        targetBall = self.GetEffectTargetBall()
+        return targetBall is not None and targetBall.model is not None
 
     def Prepare(self):
         pass
@@ -36,9 +53,13 @@ class SuperWeapon(StretchEffect):
         effect = self.RecycleOrLoad(self.graphicFile)
         effect.source = trinity.TriVectorSequencer()
         effect.source.operator = 1
-        sourceLocation = trinity.EveLocalPositionCurve(trinity.EveLocalPositionBehavior.damageLocator)
+        sourceLocation = trinity.EveLocalPositionCurve(self.startLocation)
         sourceLocation.parent = sourceBall.model
+        sourceLocation.parentPositionCurve = sourceBall
+        sourceLocation.parentRotationCurve = sourceBall
         sourceLocation.alignPositionCurve = targetBall
+        sourceScale = GetBoundingBox(sourceBall, scale=1.2)
+        sourceLocation.boundingSize = sourceScale
         effect.source.functions.append(sourceLocation)
         sourceOffsetCurve = trinity.TriVectorCurve()
         if self.projectileCount > 1:
@@ -50,9 +71,13 @@ class SuperWeapon(StretchEffect):
         effect.source.functions.append(sourceOffsetCurve)
         effect.dest = trinity.TriVectorSequencer()
         effect.dest.operator = 1
-        destLocation = trinity.EveLocalPositionCurve(trinity.EveLocalPositionBehavior.damageLocator)
+        destLocation = trinity.EveLocalPositionCurve(self.destLocation)
         destLocation.parent = targetBall.model
         destLocation.alignPositionCurve = sourceBall
+        destLocation.parentPositionCurve = targetBall
+        destLocation.parentRotationCurve = targetBall
+        targetScale = GetBoundingBox(targetBall, scale=1.2)
+        destLocation.boundingSize = targetScale
         effect.dest.functions.append(destLocation)
         destOffsetCurve = trinity.TriVectorCurve()
         if self.projectileCount > 1:
@@ -62,15 +87,26 @@ class SuperWeapon(StretchEffect):
         offset = geo2.QuaternionTransformVector(rotation, offset)
         destOffsetCurve.value = offset
         effect.dest.functions.append(destOffsetCurve)
+        blue.synchro.SleepSim(self.delayBeforeEffect)
         delay = random.random() * self.maxDelay
         blue.synchro.SleepSim(delay)
         self.AddToScene(effect)
         effect.Start()
         blue.synchro.SleepSim(self.delayUntilShipHit)
-        if targetBall.model is not None:
-            impactMass = targetBall.mass * targetBall.model.boundingSphereRadius * 2.0 / (250.0 * self.projectileCount)
-            targetShip = sm.GetService('michelle').GetBall(targetBall.id)
+        if self.IsTargetStillValid() and self.delayUntilDamageApplied is not None:
+            impactMass = targetBall.mass * targetBall.model.boundingSphereRadius * self.impactMassFraction / (250.0 * self.projectileCount)
+            targetShip = self.GetEffectTargetBall()
             targetShip.ApplyTorqueAtPosition(effect.dest.value, direction, impactMass)
+            impactDirection = geo2.Vec3Scale(direction, -1.0)
+            if self.projectileCount == 1:
+                impactScale = 16.0 * self.impactMassFraction
+            else:
+                impactScale = 8.0 * self.impactMassFraction
+            damageDuration = self.delayUntilDamageApplied - self.delayUntilShipHit + 500
+            targetBall.model.CreateImpact(destLocation.damageLocatorIndex, impactDirection, damageDuration * 0.001, impactScale)
+            blue.synchro.SleepSim(damageDuration)
+            if self.projectileCount == 1 and self.IsTargetStillValid() and self.delayUntilDamageApplied is not None:
+                targetBall.model.CreateImpact(destLocation.damageLocatorIndex, impactDirection, 3, impactScale)
         blue.synchro.SleepSim(duration * 3)
         self.RemoveFromScene(effect)
         sourceLocation.parent = None
@@ -104,6 +140,8 @@ class SlashWeapon(StretchEffect):
         StretchEffect.__init__(self, trigger, *args)
         self.startTargetOffset = trigger.graphicInfo.startTargetOffset
         self.endTargetOffset = trigger.graphicInfo.endTargetOffset
+        self.warmupDurationSeconds = trigger.graphicInfo.warmupDuration / 1000
+        self.damageDurationSeconds = trigger.graphicInfo.damageDuration / 1000
 
     def Prepare(self):
         shipBall = self.GetEffectShipBall()
@@ -115,8 +153,8 @@ class SlashWeapon(StretchEffect):
         self.gfx.dest.startPositionCurve = shipBall
         self.gfx.dest.offsetDir1 = self.startTargetOffset
         self.gfx.dest.offsetDir2 = self.endTargetOffset
-        self.gfx.dest.delayTime = 10.0
-        self.gfx.dest.sweepTime = 10.0
+        self.gfx.dest.delayTime = self.warmupDurationSeconds
+        self.gfx.dest.sweepTime = self.damageDurationSeconds
         sourceBehavior = trinity.EveLocalPositionBehavior.nearestBounds
         self.gfx.source = trinity.EveLocalPositionCurve(sourceBehavior)
         self.gfx.source.offset = self.sourceOffset

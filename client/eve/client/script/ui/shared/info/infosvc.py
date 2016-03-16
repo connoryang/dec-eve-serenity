@@ -174,7 +174,14 @@ class Info(service.Service):
                                    ('thermal', const.attributeShieldThermalDamageResonance),
                                    ('kinetic', const.attributeShieldKineticDamageResonance),
                                    ('explosive', const.attributeShieldExplosiveDamageResonance)]}
-            shipAttributes[localization.GetByLabel('UI/Fitting/FittingWindow/Capacitor')] = {'normalAttributes': [const.attributeCapacitorCapacity, const.attributeRechargeRate, const.attributeCapacitorWarfareResistance]}
+            shipAttributes[localization.GetByLabel('UI/Common/EWarResistances')] = {'normalAttributes': [const.attributeRemoteAssistanceImpedance,
+                                  const.attributeRemoteRepairImpedance,
+                                  const.attributeEnergyWarfareResistance,
+                                  const.attributeSensorDampenerResistance,
+                                  const.attributeStasisWebifierResistance,
+                                  const.attributeTargetPainterResistance,
+                                  const.attributeWeaponDisruptionResistance]}
+            shipAttributes[localization.GetByLabel('UI/Fitting/FittingWindow/Capacitor')] = {'normalAttributes': [const.attributeCapacitorCapacity, const.attributeRechargeRate]}
             shipAttributes[localization.GetByLabel('UI/Fitting/FittingWindow/Targeting')] = {'normalAttributes': [const.attributeMaxTargetRange,
                                   const.attributeMaxRange,
                                   const.attributeMaxLockedTargets,
@@ -2721,6 +2728,7 @@ class Info(service.Service):
 
     def GetGMGiveSkillMenu(self, typeID):
         subMenu = (('Remove', self.DoRemoveSkill, (typeID,)),
+         ('0', self.DoGiveSkills, ({typeID: 0}, None)),
          ('1', self.DoGiveSkills, ({typeID: 1}, None)),
          ('2', self.DoGiveSkills, ({typeID: 2}, None)),
          ('3', self.DoGiveSkills, ({typeID: 3}, None)),

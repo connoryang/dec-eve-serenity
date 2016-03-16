@@ -1,10 +1,13 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\baseCamera.py
 import math
+from eve.client.script.ui.camera.cameraUtil import GetBall, GetBallPosition, GetDurationByDistance
 import trinity
 import geo2
 import uthread
 import blue
 import logmodule as log
+import evegraphics.settings as gfxsettings
+K_ZOOMPOWER = 9
 
 class Camera(object):
     __typename__ = None
@@ -18,11 +21,11 @@ class Camera(object):
     default_upDirection = (0, 1, 0)
     maxFov = 1.5
     minFov = 0.2
-    kZoomSpeed = 20.0
-    kZoomStopDist = 0.0001
+    kZoomSpeed = 10.0
+    kZoomStopDist = 1e-05
     maxZoom = 100
     minZoom = 10000
-    kFovSpeed = 4.0
+    kFovSpeed = 10.0
     kFovStopDist = 0.001
     kOrbitSpeed = 5.0
     kOrbitStopAngle = 0.0001
@@ -283,28 +286,28 @@ class Camera(object):
             return
         if self.zoomTarget is None:
             self.zoomTarget = self.GetZoomProportion()
-        distProp = self.GetZoomDistance() / self.minZoom
-        self.zoomTarget += distProp ** 0.8 * dz
-        self.zoomTarget = max(0.0, min(self.zoomTarget, 1.0))
+        self.zoomTarget += 0.3 * dz
+        self.zoomTarget = self._ClampZoomProp(self.zoomTarget)
         if not self.zoomUpdateThread:
             self.zoomUpdateThread = uthread.new(self.ZoomUpdateThread)
 
     def ZoomUpdateThread(self):
         try:
+            zoomProp = self.GetZoomProportion()
             while True:
                 if self.zoomTarget is None:
                     break
-                zoomProporition = self.GetZoomProportion()
-                distLeft = self.zoomTarget - zoomProporition
+                distLeft = self.zoomTarget - zoomProp
                 if not distLeft:
                     break
                 distProp = self.GetZoomDistance() / self.minZoom
-                zoomSpeed = (0.2 + 0.8 * distProp ** 0.6) * self._GetZoomSpeed()
+                zoomSpeed = self._GetZoomSpeed()
                 moveProp = zoomSpeed / blue.os.fps
                 if math.fabs(distLeft) < self.kZoomStopDist:
                     moveProp *= self.kZoomStopDist / math.fabs(distLeft)
                 moveProp = min(moveProp, 1.0)
-                self._ApplyZoom(moveProp * distLeft)
+                zoomProp += distLeft * moveProp
+                self.SetZoom(zoomProp)
                 if moveProp == 1.0:
                     break
                 blue.synchro.Yield()
@@ -313,20 +316,31 @@ class Camera(object):
             self.zoomUpdateThread = None
             self.zoomTarget = None
 
-    def _ApplyZoom(self, toMove):
-        toMove *= self.minZoom - self.maxZoom
-        toMove = geo2.Vec3Scale(self.GetLookAtDirection(), toMove)
-        self._eyePosition = geo2.Add(self._eyePosition, toMove)
+    def _ClampZoomProp(self, ret):
+        minZoomProp = self.GetMinZoomProp()
+        return max(minZoomProp, min(ret, 1.0))
+
+    def GetMinZoomProp(self):
+        return 0.2 + self.maxZoom / self.minZoom
+
+    def GetZoomDistanceByZoomProportion(self, zoomProp):
+        return self.maxZoom + zoomProp ** K_ZOOMPOWER * (self.minZoom - self.maxZoom)
 
     def GetZoom(self):
         return 1.0 - self.GetZoomProportion()
 
     def SetZoom(self, proportion):
+        proportion = self._ClampZoomProp(proportion)
         vec = self.GetLookAtDirection()
-        zoomVec = geo2.Vec3Scale(vec, self.maxZoom + (self.minZoom - self.maxZoom) * proportion)
+        distance = self.GetZoomDistanceByZoomProportion(proportion)
+        zoomVec = geo2.Vec3Scale(vec, distance)
         self._eyePosition = geo2.Vec3Add(self._atPosition, zoomVec)
 
     zoom = property(GetZoom, SetZoom)
+
+    def SetZoomDistance(self, distance):
+        zoomVec = geo2.Vec3Scale(self.GetLookAtDirection(), distance)
+        self._eyePosition = geo2.Vec3Add(self._atPosition, zoomVec)
 
     def FovZoom(self, dz):
         if self.fovTarget is not None:
@@ -349,7 +363,7 @@ class Camera(object):
                 distLeft = self.fovTarget - self.fov
                 if not distLeft:
                     break
-                moveProp = self.kFovSpeed / blue.os.fps
+                moveProp = self._GetFovSpeed() / blue.os.fps
                 if math.fabs(distLeft) < self.kFovStopDist:
                     moveProp *= self.kFovStopDist / math.fabs(distLeft)
                 moveProp = min(moveProp, 1.0)
@@ -364,6 +378,10 @@ class Camera(object):
         finally:
             self.fovUpdateThread = None
             self.fovTarget = None
+
+    def _GetFovSpeed(self):
+        multiplier = self._GetCameraSpeedMultiplier()
+        return self.kFovSpeed * multiplier
 
     def _EnforceMinMaxFov(self, value):
         if value >= self.maxFov:
@@ -387,15 +405,16 @@ class Camera(object):
         return dist
 
     def GetZoomProportion(self):
-        ret = self.GetZoomProportionUnfiltered()
-        return max(0.0, min(ret, 1.0))
+        zoomProp = self.GetZoomProportionUnfiltered()
+        return self._ClampZoomProp(zoomProp)
 
     def GetZoomProportionUnfiltered(self):
-        dist = self.GetZoomDistance()
-        ret = (dist - self.maxZoom) / (self.minZoom - self.maxZoom)
-        if math.isinf(ret):
-            ret = 1.0
-        return ret
+        zoomDist = max(self.maxZoom, self.GetZoomDistance())
+        zoomProp = self.GetZoomProportionByZoomDistance(zoomDist)
+        return zoomProp
+
+    def GetZoomProportionByZoomDistance(self, zoomDist):
+        return ((zoomDist - self.maxZoom) / (self.minZoom - self.maxZoom)) ** (1.0 / K_ZOOMPOWER)
 
     def SetMaxZoom(self, value):
         self.maxZoom = value
@@ -407,6 +426,8 @@ class Camera(object):
         diff = geo2.Subtract(self.eyePosition, self.atPosition)
         if not self.orbitTarget:
             self.orbitTarget = (0, self.GetAngleLookAtToUpDirection())
+        if gfxsettings.Get(gfxsettings.UI_CAMERA_INVERT_Y):
+            dy *= -1
         yaw = self.orbitTarget[0] - dx
         pitch = self.orbitTarget[1] - dy / 2.0
         pitch = max(self.kMinPitch, min(pitch, self.kMaxPitch))
@@ -456,7 +477,7 @@ class Camera(object):
         return self.kOrbitSpeed * multiplier
 
     def _GetCameraSpeedMultiplier(self):
-        multiplier = settings.user.ui.Get('cameraMouseLookSpeedSlider', 0.0)
+        multiplier = gfxsettings.Get(gfxsettings.UI_CAMERA_SPEED)
         if multiplier < 0:
             multiplier = 1.0 / (1.0 - multiplier)
         else:
@@ -507,19 +528,17 @@ class Camera(object):
     def GetDistanceFromLookAt(self):
         return geo2.Vec3Distance(self.eyePosition, self.atPosition)
 
-    def LookAt(self, position, duration = None, followWithEye = True, eyePos = None):
-        if duration:
-            uicore.animations.MorphVector3(self, 'atPosition', self.atPosition, position, duration=duration)
-        else:
-            self.atPosition = position
-        if followWithEye:
-            if not eyePos:
-                eyePos = geo2.Subtract(self.eyePosition, self.atPosition)
-                eyePos = geo2.Add(eyePos, position)
-            if duration:
-                uicore.animations.MorphVector3(self, 'eyePosition', self.eyePosition, eyePos, duration=duration)
-            else:
-                self.eyePosition = eyePos
+    def LookAt(self, itemID, radius = None):
+        ball = GetBall(itemID)
+        if not ball:
+            return
+        if not radius:
+            radius = ball.radius * 2
+        atPos1 = GetBallPosition(ball)
+        direction = self.GetLookAtDirectionWithOffset()
+        eyePos1 = geo2.Vec3Add(atPos1, geo2.Vec3Scale(direction, radius))
+        duration = GetDurationByDistance(self.eyePosition, eyePos1, 0.3, 0.6)
+        self.TransitTo(atPos1, eyePos1, duration=duration)
 
     def TransitTo(self, atPosition = None, eyePosition = None, duration = 1.0, smoothing = 0.1, numPoints = 1000, timeOffset = 0.0):
         self.Transit(self.atPosition, self.eyePosition, atPosition, eyePosition, duration, smoothing, numPoints, timeOffset)
@@ -719,10 +738,10 @@ class Camera(object):
 
         return False
 
-    def GetCameraInterestID(self):
+    def GetTrackItemID(self):
         return None
 
-    def ResetCamera(self):
+    def ResetCamera(self, *args):
         pass
 
     def ResetCameraPosition(self):
@@ -730,3 +749,10 @@ class Camera(object):
         self.eyePosition = self.default_eyePosition
         self.fov = self.default_fov
         self.trackTarget = None
+
+    def ProjectWorldToCamera(self, vec):
+        return geo2.Vec3Transform(vec, self.viewMatrix.transform)
+
+    def IsInFrontOfCamera(self, vec):
+        vec = self.ProjectWorldToCamera(vec)
+        return vec[2] < -self.nearClip

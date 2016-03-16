@@ -20,8 +20,7 @@ MOUSE_MOVE_DELTA_HISTORY_BUFFER_LENGTH = 10
 class EveCameraClient(CameraClient):
     __guid__ = 'svc.eveCameraClient'
     __replaceservice__ = 'cameraClient'
-    __exportedcalls__ = {'GetCameraSettings': [],
-     'CheckCameraOffsets': [],
+    __exportedcalls__ = {'CheckCameraOffsets': [],
      'CheckMouseLookSpeed': []}
     __dependencies__ = CameraClient.__dependencies__[:]
     __dependencies__.extend(['mouseInput', 'sceneManager'])
@@ -102,21 +101,13 @@ class EveCameraClient(CameraClient):
                 modifier = uicore.mouseInputHandler.GetCameraZoomModifier()
                 activeCamera.AdjustZoom(modifier * delta * cameras.MOUSE_LOOK_SPEED)
 
-    def GetCameraSettings(self):
-        offset = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_OFFSET)
-        invertY = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_INVERT_Y)
-        mouseLookSpeed = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_MOUSE_LOOK_SPEED)
-        mouseSmooth = True
-        mySettings = util.KeyVal(charOffsetSetting=offset, invertY=invertY, mouseLookSpeed=mouseLookSpeed, mouseSmooth=mouseSmooth)
-        return mySettings
-
     def ApplyUserSettings(self):
         self.CheckCameraOffsets()
         self.CheckInvertY()
         self.CheckMouseLookSpeed()
 
     def CheckCameraOffsets(self):
-        offset = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_OFFSET)
+        offset = gfxsettings.Get(gfxsettings.UI_CAMERA_OFFSET) / 10.0
         offsetBehaviors = []
         for cam in self.cameraStack:
             offsetBehavior = cam.GetBehavior(cameras.CharacterOffsetBehavior)
@@ -127,10 +118,10 @@ class EveCameraClient(CameraClient):
             offsetBehavior.AdjustOffset(offset)
 
     def CheckInvertY(self):
-        self.invertYAxis = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_INVERT_Y)
+        self.invertYAxis = gfxsettings.Get(gfxsettings.UI_CAMERA_INVERT_Y)
 
     def CheckMouseLookSpeed(self):
-        self.mouseLookSpeed = gfxsettings.Get(gfxsettings.UI_INCARNA_CAMERA_MOUSE_LOOK_SPEED)
+        self.mouseLookSpeed = 0.005 + 0.001 * gfxsettings.Get(gfxsettings.UI_CAMERA_SPEED)
 
     def Disable(self):
         CameraClient.Disable(self)

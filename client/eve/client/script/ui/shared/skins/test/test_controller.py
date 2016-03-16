@@ -2,7 +2,7 @@
 import contextlib
 import mock
 import unittest
-from fsdlite import Signal
+import signals
 
 class MockSkin(object):
 
@@ -29,7 +29,7 @@ class MockFittingController(object):
     def __init__(self, itemID, typeID):
         self.itemID = itemID
         self.typeID = typeID
-        self.on_new_itemID = Signal()
+        self.on_new_itemID = signals.Signal()
         self.material = None
 
     def GetItemID(self):

@@ -34,3 +34,4 @@ infoEventWndOpenedCounters = 34
 infoEventTaskCompleted = 35
 infoEventCharacterCreationStep = 36
 infoEventCharacterFinalStep = 37
+infoEventVideoPlayed = 38

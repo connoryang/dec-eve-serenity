@@ -379,8 +379,8 @@ class SpaceObject(decometaclass.WrapBlueClass('destiny.ClientBall')):
         self._audioEntity = None
         scene = self.spaceMgr.GetScene()
         camera = sm.GetService('sceneManager').GetActiveSpaceCamera()
-        lookingAt = camera.LookingAt()
-        interestID = camera.GetCameraInterestID()
+        lookingAt = camera.GetLookAtItemID()
+        interestID = camera.GetTrackItemID()
         if self.explodeOnRemove and (self.id == lookingAt or interestID == self.id):
             self.RemoveAllModelsFromScene(scene)
         else:

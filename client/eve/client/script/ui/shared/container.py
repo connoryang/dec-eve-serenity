@@ -289,6 +289,9 @@ class _InvContBase(uiprimitives.Container):
             self.topCont = uiprimitives.Container(parent=self, align=uiconst.TOTOP, height=22)
             uicls.InvContViewBtns(parent=self.topCont, align=uiconst.CENTERLEFT, controller=self)
             uicls.InvContQuickFilter(parent=self.topCont, align=uiconst.CENTERRIGHT, invCont=self)
+        self.ConstructUI()
+
+    def ConstructUI(self):
         self.scroll = uicontrols.Scroll(parent=self, state=uiconst.UI_PICKCHILDREN)
         self.scroll.sr.id = 'containerWnd_%s' % self.invController.GetName()
         self.scroll.OnNewHeaders = self.OnNewHeadersSet

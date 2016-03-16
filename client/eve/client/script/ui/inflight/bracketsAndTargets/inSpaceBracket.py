@@ -5,7 +5,6 @@ from eve.client.script.spacecomponents.activatecontroller import ActivateCounter
 from eve.client.script.spacecomponents.bountyescrowcontroller import BountyEscrowCounterController
 from eve.client.script.spacecomponents.reinforcecontroller import ReinforceCounterController
 from eve.client.script.spacecomponents.jumppolarizationcontroller import JumpPolarizationCounterController
-from eve.client.script.ui.camera.dungeonEditorCamera import DungeonEditorCamera
 from eve.client.script.ui.control.eveHint import BubbleHint
 from eve.client.script.ui.inflight.bracket import BracketShadowLabel
 from eve.client.script.ui.inflight.bracketsAndTargets.bracketVarious import GetMinDispRangeForOwnShip
@@ -561,10 +560,6 @@ class InSpaceBracket(uiprimitives.Bracket):
 
     def OnClick(self, *args):
         if self.sr.clicktime and blue.os.TimeDiffInMs(self.sr.clicktime, blue.os.GetWallclockTime()) < 1000.0:
-            camera = sm.GetService('sceneManager').GetActiveCamera()
-            if isinstance(camera, DungeonEditorCamera) and camera.dungeonHack.IsFreeLook():
-                camera.LookAt(self.itemID)
-                return
             sm.GetService('state').SetState(self.itemID, state.selected, 1)
             slimItem = getattr(self, 'slimItem', None)
             if slimItem:

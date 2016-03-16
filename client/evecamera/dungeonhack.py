@@ -4,63 +4,49 @@ import geo2
 import trinity
 import carbonui.const as uiconst
 import uthread
-FREELOOK_KEYS = 'WASDRF'
 
 class DungeonHack(object):
 
-    def __init__(self, cameraSvc):
-        self._cameraSvc = cameraSvc
+    def __init__(self):
         self._Reset()
+        self.InitAxisLines()
 
     def _Reset(self):
         self._clientToolsScene = None
-        self._freeLook = False
         self._drawAxis = True
         self._gridEnabled = True
-        self._gridSpacing = 1000.0
-        self._gridLength = 20000.0
+        self._gridSpacing = 10000.0
+        self._gridLength = 200000.0
 
-    def IsFreeLook(self):
-        return self._freeLook
+    def RemoveAxisLines(self):
+        try:
+            self._clientToolsScene.primitives.remove(self.axisLines)
+        except ValueError:
+            pass
 
-    def SetFreeLook(self, freeLook = True):
-        if self._freeLook == freeLook:
-            return
-        self._freeLook = freeLook
-        camera = sm.GetService('sceneManager').GetActiveCamera()
-        if camera is None:
-            return
-        if freeLook:
-            cameraParent = self._cameraSvc.GetCameraParent()
-            cameraParent.translationCurve = None
-            self.axisLines = trinity.Tr2LineSet()
-            self.axisLines.effect = trinity.Tr2Effect()
-            self.axisLines.effect.effectFilePath = 'res:/Graphics/Effect/Managed/Utility/LinesWithZ.fx'
-            self._clientToolsScene = self._GetClientToolsScene()
-            self._clientToolsScene.primitives.append(self.axisLines)
-            self._ChangeCamPos(cameraParent.translation)
-            self._BuildGridAndAxes()
-            uthread.new(self._UpdateFreelookCamera)
-        else:
-            self._cameraSvc.ResetCamera()
-            try:
-                self._clientToolsScene.primitives.remove(self.axisLines)
-            except ValueError:
-                pass
+        self.axisLines = None
 
-            self.axisLines = None
+    def InitAxisLines(self):
+        self.axisLines = trinity.Tr2LineSet()
+        self.axisLines.effect = trinity.Tr2Effect()
+        self.axisLines.effect.effectFilePath = 'res:/Graphics/Effect/Managed/Utility/LinesWithZ.fx'
+        self._clientToolsScene = self._GetClientToolsScene()
+        self._clientToolsScene.primitives.append(self.axisLines)
+        self._BuildGridAndAxes()
 
     def IsDrawingAxis(self):
         return self._drawAxis
 
     def SetDrawAxis(self, enabled = True):
         self._drawAxis = enabled
+        self._BuildGridAndAxes()
 
     def IsGridEnabled(self):
         return self._gridEnabled
 
     def SetGridState(self, enabled = True):
         self._gridEnabled = enabled
+        self._BuildGridAndAxes()
 
     def GetGridSpacing(self):
         return self._gridSpacing
@@ -146,34 +132,8 @@ class DungeonHack(object):
             self.axisLines.AddLine(startX, color, endX, color)
         self.axisLines.SubmitChanges()
 
-    def _ChangeCamPos(self, vec):
-        camParent = self._cameraSvc.GetCameraParent()
-        transl = camParent.translation
-        camParent.translation = geo2.Vec3Add(transl, vec)
-
-    def _UpdateFreelookCamera(self):
-        lastTime = blue.os.GetSimTime()
-        while self.IsFreeLook():
-            camera = sm.GetService('sceneManager').GetActiveCamera()
-            if camera is not None:
-                delta = blue.os.TimeDiffInMs(lastTime, blue.os.GetSimTime())
-                keyDown = uicore.uilib.Key
-                if keyDown(uiconst.VK_CONTROL) and not keyDown(uiconst.VK_MENU) and not keyDown(uiconst.VK_SHIFT):
-                    if keyDown(uiconst.VK_W):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.viewVec, -delta))
-                    if keyDown(uiconst.VK_S):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.viewVec, delta))
-                    if keyDown(uiconst.VK_A):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.rightVec, -delta))
-                    if keyDown(uiconst.VK_D):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.rightVec, delta))
-                    if keyDown(uiconst.VK_R):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.upVec, delta))
-                    if keyDown(uiconst.VK_F):
-                        self._ChangeCamPos(geo2.Vec3Scale(camera.upVec, -delta))
-                self.axisLines.localTransform = geo2.MatrixTranslation(*self._cameraSvc.GetCameraParent().translation)
-            lastTime = blue.os.GetSimTime()
-            blue.synchro.Yield()
+    def GetCamera(self):
+        return sm.GetService('sceneManager').GetActivePrimaryCamera()
 
     def _GetClientToolsScene(self):
         if self._clientToolsScene is not None:

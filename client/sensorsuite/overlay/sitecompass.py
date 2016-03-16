@@ -12,12 +12,10 @@ import math
 import logging
 from carbonui.uianimations import animations
 from carbonui.util.color import Color
-from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive
 from eve.client.script.ui.control.buttonGroup import ButtonGroup
 from eve.client.script.ui.control.buttons import Button
 from eve.client.script.ui.control.tooltips import ShortcutHint
 from eve.client.script.ui.eveFontConst import STYLE_HEADER
-import evecamera
 import gametime
 import sensorsuite.overlay.const as overlayConst
 from sensorsuite.overlay.sitetype import *

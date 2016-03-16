@@ -536,6 +536,14 @@ class ShipDroneBay(BaseShipBay):
     scope = 'station'
 
 
+class ShipFighterBay(BaseShipBay):
+    __guid__ = 'invCtrl.ShipFighterBay'
+    iconName = 'res:/UI/Texture/WindowIcons/dronebay.png'
+    locationFlag = const.flagFighterBay
+    hasCapacity = True
+    scope = 'station'
+
+
 class ShipFuelBay(BaseShipBay):
     __guid__ = 'invCtrl.ShipFuelBay'
     locationFlag = const.flagSpecializedFuelBay

@@ -10,7 +10,7 @@ import uthread
 import log
 import base
 import util
-import characterskills.util
+import characterskills as charskills
 import carbonui.const as uiconst
 import localization
 import telemetry
@@ -211,10 +211,9 @@ class BaseSkillEntry(uicontrols.SE_BaseClassCore):
             spHi = skillSvc.SkillpointsNextLevel(skill.typeID)
             spm = skillSvc.GetSkillpointsPerMinute(skill.typeID)
             currentPoints = min(spHi - secs / 60.0 * spm, spHi)
-            self.GetIcon('intraining')
         else:
             currentPoints = skill.skillPoints
-        currentSpL = characterskills.util.GetSPForLevelRaw(skill.skillRank, skill.skillLevel)
+        currentSpL = charskills.GetSPForLevelRaw(skill.skillRank, skill.skillLevel)
         spHi = skillSvc.SkillpointsNextLevel(skill.typeID)
         if skill.skillPoints < spHi:
             spLo = skillSvc.SkillpointsCurrentLevel(skill.typeID)
@@ -336,6 +335,8 @@ class SkillEntry(BaseSkillEntry):
         currentPoints = BaseSkillEntry.UpdateTraining(self, skill)
         level = skill.skillLevel
         fill = self.sr.Get('box_%s' % int(level))
+        if not fill:
+            return
         fill.state = uiconst.UI_DISABLED
         fill.SetRGB(*self.lightBlueColor)
         sm.StartService('ui').BlinkSpriteA(fill, 1.0, time=1000.0, maxCount=0, passColor=0, minA=0.5)

@@ -19,6 +19,8 @@ TYPE_SKINLICENSE = 16
 TYPE_SKINMATERIAL = 17
 TYPE_SKINDESCRIPTION = 18
 TYPE_PLEX = 59
+TYPE_SKILLINJECTOR = 66
+TYPE_SKILLEXTRACTOR = 67
 TYPE_STARGATE = 30
 TYPE_CONTROLTOWER = 31
 TYPE_CONSTRUCTIONPLATFORM = 32
@@ -54,7 +56,9 @@ infoTypeByTypeID = {const.typeBookmark: TYPE_BOOKMARK,
  const.typeSkinMaterial: TYPE_SKINMATERIAL,
  const.typeEntosisCommandNode: TYPE_ENTOSISNODE,
  const.typeCommandNodeBeacon: TYPE_COMMANDNODEBEACON,
- const.typePilotLicence: TYPE_PLEX}
+ const.typePilotLicence: TYPE_PLEX,
+ const.typeSkillInjector: TYPE_SKILLINJECTOR,
+ const.typeSkillExtractor: TYPE_SKILLEXTRACTOR}
 infoTypeByGroupID = {const.groupCharacter: TYPE_CHARACTER,
  const.groupCorporation: TYPE_CORPORATION,
  const.groupAlliance: TYPE_ALLIANCE,

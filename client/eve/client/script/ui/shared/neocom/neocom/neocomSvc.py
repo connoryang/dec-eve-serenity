@@ -37,6 +37,8 @@ from eve.client.script.ui.shared.fitting.fittingWnd import FittingWindow2
 from eve.client.script.ui.station.fw.base_fw import MilitiaWindow
 from eve.client.script.ui.station.securityOfficeWindow import SecurityOfficeWindow
 from achievements.client.achievementTreeWindow import AchievementTreeWindow
+from projectdiscovery.client.window import ProjectDiscoveryWindow
+from projectdiscovery import IsProjectDiscoveryEnabled
 import util
 import uiutil
 import service
@@ -171,6 +173,13 @@ BTNDATARAW_BY_ID = {'addressbook': BtnDataRaw(cmdName='OpenPeopleAndPlaces', wnd
  'redeemItems': BtnDataRaw(cmdName='ToggleRedeemItems', wndCls=RedeemWindow),
  'opportunities': BtnDataRaw(cmdName='ToggleOpportunity', wndCls=AchievementTreeWindow)}
 
+def AddProjectDiscoveryIfEnabled():
+    if IsProjectDiscoveryEnabled():
+        if 'ProjectDiscovery' not in BTNDATARAW_BY_ID:
+            RAWDATA_EVEMENU[2][2].append((neocomCommon.BTNTYPE_CMD, 'ProjectDiscovery', None))
+            BTNDATARAW_BY_ID['ProjectDiscovery'] = BtnDataRaw(label='ProjectDiscovery', cmdName='ToggleProjectDiscovery', iconPath='res:/ui/texture/WindowIcons/projectdiscovery.png', wndCls=ProjectDiscoveryWindow)
+
+
 def ConvertOldTypeOfRawData(rawData):
     if isinstance(rawData, tuple):
         if len(rawData) == 3:
@@ -251,6 +260,7 @@ class NeocomSvc(service.Service):
         return False
 
     def ResetEveMenuBtnData(self):
+        AddProjectDiscoveryIfEnabled()
         self.eveMenuBtnData = BtnDataHeadNode('eveMenu', RAWDATA_EVEMENU, isRemovable=False, persistChildren=False)
 
     def OnSessionChanged(self, isRemote, sess, change):
@@ -705,9 +715,8 @@ class NeocomSvc(service.Service):
     def GetMenuForBtnData(self, btnData):
         return []
 
-    def ShowSkillNotification(self, skillTypeIDs, onlineTraining):
-        leftSide, rightSide = uicore.layer.sidePanels.GetSideOffset()
-        sm.GetService('skills').ShowSkillNotification(skillTypeIDs, leftSide + 14, onlineTraining)
+    def GetSidePanelSideOffset(self):
+        return uicore.layer.sidePanels.GetSideOffset()
 
 
 class BtnDataNode(util.KeyVal):

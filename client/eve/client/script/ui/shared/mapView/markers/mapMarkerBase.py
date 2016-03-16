@@ -1,7 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\mapView\markers\mapMarkerBase.py
 from carbon.common.script.util.commonutils import StripTags
 from carbon.common.script.util.timerstuff import AutoTimer
-from carbonui.primitives.base import ScaleDpiF
+from carbonui.primitives.base import ScaleDpiF, ReverseScaleDpi
 from carbonui.primitives.container import Container
 from carbonui.util.bunch import Bunch
 from eve.client.script.ui.control.eveBaseLink import BaseLink
@@ -60,18 +60,13 @@ class MarkerContainerBase(Container):
 
     @apply
     def opacity():
-        doc = 'Opacity of map marker container, intended to override distance opacity if needed'
 
         def fget(self):
             return self._opacity
 
         def fset(self, value):
             self._opacity = value
-            if self.markerObject and (self.markerObject.activeState or self.markerObject.hilightState):
-                renderOpacity = 1.0
-            else:
-                renderOpacity = value
-            self.renderObject.opacity = renderOpacity
+            self.renderObject.opacity = value
 
         return property(**locals())
 
@@ -208,7 +203,7 @@ class MarkerBase(object):
             return self.projectBracket.trackPosition
 
     def OnMapMarkerDisplayChange(self, projectBracket, displayState):
-        if displayState == False and self.isLoaded:
+        if displayState is False and self.isLoaded:
             self.DestroyRenderObject()
 
     def OnMapMarkerUpdated(self, projectBracket):
@@ -224,9 +219,8 @@ class MarkerBase(object):
             cameraTranslationFromParent = self.markerHandler.cameraTranslationFromParent
             if (cameraTranslationFromParent, projectBracket.cameraDistance) != getattr(self, 'lastUpdateCameraValues', None):
                 self.lastUpdateCameraValues = (cameraTranslationFromParent, projectBracket.cameraDistance)
-                if self.markerHandler.IsActiveOfHilighted(self.markerID):
+                if self.markerHandler.IsActiveOrHilighted(self.markerID):
                     opacity = 1.0
-                    self.MoveToFront()
                 else:
                     nearFadeDist, farFadeDist = self.distanceFadeAlphaNearFar
                     if projectBracket.cameraDistance < nearFadeDist:
@@ -304,6 +298,8 @@ class MarkerBase(object):
         offsetX, offsetY = self.GetExtraContainerDisplayOffset()
         self.extraContainer.renderObject.displayX = self.markerContainer.renderObject.displayX + offsetX
         self.extraContainer.renderObject.displayY = self.markerContainer.renderObject.displayY + offsetY
+        self.extraContainer.left = ReverseScaleDpi(self.extraContainer.renderObject.displayX)
+        self.extraContainer.top = ReverseScaleDpi(self.extraContainer.renderObject.displayY)
 
     def GetExtraContainerDisplayOffset(self):
         return (0, self.markerContainer.renderObject.displayHeight)

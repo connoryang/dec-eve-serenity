@@ -6,7 +6,7 @@ import trinity
 
 class MarkerLabelBase(MarkerUniverseBased):
     fontSize = 10
-    fontColor = (0.75, 0.75, 0.75, 1.0)
+    fontColor = (1.0, 1.0, 1.0, 0.6)
     fontPath = 'res:/UI/Fonts/EveSansNeue-ExpandedBold.otf'
     letterSpace = 0
     textSprite = None
@@ -36,7 +36,7 @@ class MarkerLabelBase(MarkerUniverseBased):
         textSprite = trinity.Tr2Sprite2dTextObject()
         textSprite.fontMeasurer = self.measurer
         textSprite.color = self.fontColor
-        textSprite.blendMode = trinity.TR2_SBM_ADD
+        textSprite.blendMode = trinity.TR2_SBM_BLEND
         self.markerContainer.renderObject.children.append(textSprite)
         self.textSprite = textSprite
         height = self.measurer.ascender - self.measurer.descender

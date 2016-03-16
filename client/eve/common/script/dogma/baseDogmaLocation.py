@@ -1365,7 +1365,7 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._Add(toLocation.locationMods, toAttribID, (operation, fromAttrib), debugStr='LocMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericAddModifier(operation, toItem, toAttribID, fromAttrib)
 
     @WrappedMethod
@@ -1382,7 +1382,7 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._RemoveAndCleanup(toLocation.locationMods, toAttribID, (operation, fromAttrib), debugStr='LocMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericRemoveModifier(operation, toItem, toAttribID, fromAttrib)
 
     @WrappedMethod
@@ -1399,7 +1399,7 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._Add_2D(toLocation.locationGroupMods, groupID, toAttribID, (operation, fromAttrib), debugStr='LocGrpMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: i.invItem.groupID == groupID and toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: i.invItem.groupID == groupID and toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericAddModifier(operation, toItem, toAttribID, fromAttrib)
 
     @WrappedMethod
@@ -1416,7 +1416,7 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._RemoveAndCleanup_2D(toLocation.locationGroupMods, groupID, toAttribID, (operation, fromAttrib), debugStr='LocGrpMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: i.invItem.groupID == groupID and toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: i.invItem.groupID == groupID and toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericRemoveModifier(operation, toItem, toAttribID, fromAttrib)
 
     @WrappedMethod
@@ -1433,7 +1433,7 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._Add_2D(toLocation.locationReqSkillMods, skillID, toAttribID, (operation, fromAttrib), debugStr='LocReqSkillMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: skillID in i.reqSkills and toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: skillID in i.reqSkills and toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericAddModifier(operation, toItem, toAttribID, fromAttrib)
 
     @WrappedMethod
@@ -1450,8 +1450,15 @@ class BaseDogmaLocation(object):
         if not toLocation:
             return
         self._RemoveAndCleanup_2D(toLocation.locationReqSkillMods, skillID, toAttribID, (operation, fromAttrib), debugStr='LocReqSkillMod for Location {}'.format(toLocation))
-        for toItem in filter(lambda i: skillID in i.reqSkills and toAttribID in i.attributes, toLocation.subItems):
+        for toItem in filter(lambda i: skillID in i.reqSkills and toAttribID in i.attributes, self.IterFittedItems(toLocation)):
             self._GenericRemoveModifier(operation, toItem, toAttribID, fromAttrib)
+
+    def IterFittedItems(self, toLocation):
+        try:
+            return toLocation.fittedItems.itervalues()
+        except AttributeError:
+            self.LogError('IterFittedItems - Failed to get fitted items', toLocation)
+            return []
 
     @WrappedMethod
     @telemetry.ZONE_METHOD

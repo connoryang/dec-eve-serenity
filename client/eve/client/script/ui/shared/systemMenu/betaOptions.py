@@ -5,10 +5,10 @@ import localization
 import service
 BETA_MAP_SETTING_KEY = 'experimental_map_default'
 BETA_SCANNERS_SETTING_KEY = 'experimental_scanners'
-BETA_NEWCAM_SETTING_KEY = 'experimental_newcam'
+BETA_NEWCAM_SETTING_KEY = 'experimental_newcam2'
 DEFAULT_SETTINGS = {BETA_MAP_SETTING_KEY: True,
  BETA_SCANNERS_SETTING_KEY: True,
- BETA_NEWCAM_SETTING_KEY: False}
+ BETA_NEWCAM_SETTING_KEY: True}
 
 def ConstructOptInSection(column, columnWidth):
     optInOptions = GetOptInOptions()
@@ -36,7 +36,8 @@ def ToggleNewCamera(activate):
             sceneMan.SetActiveCameraByID(evecamera.CAM_SHIPORBIT)
     else:
         if session.solarsystemid:
-            sceneMan.SetActiveCameraByID(evecamera.CAM_SPACE_PRIMARY)
+            cam = sceneMan.SetActiveCameraByID(evecamera.CAM_SPACE_PRIMARY)
+            cam.LookAt(session.shipid)
         for cameraID in (evecamera.CAM_SHIPORBIT, evecamera.CAM_SHIPPOV, evecamera.CAM_TACTICAL):
             sceneMan.UnregisterCamera(cameraID)
 

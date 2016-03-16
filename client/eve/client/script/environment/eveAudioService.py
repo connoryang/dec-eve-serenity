@@ -56,8 +56,16 @@ class DungeonCheckerService(service.Service):
 
 class DynamicMusicService(service.Service):
     __guid__ = 'svc.dynamicMusic'
-    __notifyevents__ = ['OnSessionChanged', 'OnChannelsJoined', 'OnWarpFinished']
+    __notifyevents__ = ['OnSessionChanged',
+     'OnChannelsJoined',
+     'OnWarpFinished',
+     'OnStateChange']
     __dependencies__ = ['audio', 'dungeonChecker']
+
+    def __init__(self):
+        service.Service.__init__(self)
+        self.threatList = {}
+        self.underThreat = False
 
     def Run(self, *args):
         service.Service.Run(self, *args)
@@ -108,3 +116,23 @@ class DynamicMusicService(service.Service):
         if session.solarsystemid2:
             securityStatus = sm.GetService('map').GetSecurityClass(session.solarsystemid2)
         return securityStatus
+
+    def OnStateChange(self, itemID, flag, flagState, *args):
+        self.UpdateCombatMusicState(itemID, flag, flagState)
+
+    def UpdateCombatMusicState(self, itemID, flag, flagState):
+        if self.dungeonChecker.IsInDungeon():
+            return
+        if self.audio.GetCombatMusicUsage():
+            if flag == 7:
+                if flagState == 1:
+                    self.threatList[itemID] = flagState
+                elif flagState == 0 and self.threatList.has_key(itemID):
+                    self.threatList.pop(itemID)
+            if len(self.threatList) > 0 and not self.underThreat:
+                self.audio.SendUIEvent('music_switch_dungeon_level_03')
+                self.audio.SendUIEvent('music_dungeon_start_zero_level_03')
+                self.underThreat = True
+            elif len(self.threatList) == 0 and self.underThreat:
+                self.UpdateDynamicMusic()
+                self.underThreat = False

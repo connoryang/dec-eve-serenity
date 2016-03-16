@@ -2203,6 +2203,11 @@ class CreateContract(uicontrols.Window):
         self.data.items = {}
 
     def OnAvailChange(self, wnd, *args):
+        uthread.new(self._OnAvailChange, wnd)
+
+    def _OnAvailChange(self, wnd, *args):
+        if self.destroyed:
+            return
         if not wnd:
             key = getattr(self.data, 'lastAvailKey', 0)
         else:

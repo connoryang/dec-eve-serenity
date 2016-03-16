@@ -33,18 +33,18 @@ def GetCharLocation(charID):
 
 def GetCharLocation2(charID):
     try:
-        x, y, z = GetCharLocationEx(charID)
+        locationID, locationGroupID, charLocationID = GetCharLocationEx(charID)
     except RuntimeError:
-        y = None
+        locationGroupID = None
 
-    if y is None:
+    if locationGroupID is None:
         charUnboundMgr = sm.services['charUnboundMgr']
         charMgr = sm.services['charMgr']
         charUnboundMgr.MoveCharacter(charID, charMgr.GetHomeStation(charID), 0)
-        x, y, z = GetCharLocationEx(charID)
-        if y is None:
+        locationID, locationGroupID, charLocationID = GetCharLocationEx(charID)
+        if locationGroupID is None:
             raise RuntimeError('Bogus character item state', charID, x, z)
-    return (x, y, z)
+    return (locationID, locationGroupID, charLocationID)
 
 
 def IsLocationNode(session):

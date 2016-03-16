@@ -140,6 +140,9 @@ class SOFPreviewWindow:
     def _OnApplyButton(self, *args):
         self._UpdatePlayerShip()
 
+    def _OnCopyDnaButton(self, *args):
+        blue.pyos.SetClipboardData(self.GetPreviewDna())
+
     def ShowUI(self):
         uicontrols.Window.CloseIfOpen(windowID=self.windowID)
         wnd = uicontrols.Window.Open(windowID=self.windowID)
@@ -177,6 +180,7 @@ class SOFPreviewWindow:
                 buttonConts[x, y] = Container(parent=gridCont)
 
         self.dnaLabel = EveLabelSmall(name='dnaLabel', align=uiconst.CENTER, parent=headerCont, text='')
+        self.copyDnaButton = Button(name='copy_dna_button', align=uiconst.CENTER, parent=buttonConts[(0, 4)], label='Copy DNA', func=self._OnCopyDnaButton)
         self.applyButton = Button(name='apply_button', align=uiconst.CENTER, parent=buttonConts[(1, 4)], label='Apply', func=self._OnApplyButton)
         factionParent = Container(name='factionParent', parent=buttonConts[(0, 2)], align=uiconst.CENTER, height=18, width=175)
         self.factionCombo = Combo(name='faction_combo', align=uiconst.TOLEFT, width=150, parent=factionParent, label='Faction:', options=self.sofFactions, callback=self.OnFactionComboChange, select=self.GetComboListIndex(self.sofFactions, self.currentFaction))

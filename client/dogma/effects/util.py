@@ -38,10 +38,10 @@ modifierGetterByType = {'ItemModifier': _GetItemModifier,
  'GangItemModifier': _GetGangItemModifier,
  'GangRequiredSkillModifier': _GetGangRequiredSkillModifier}
 
-def CreateEffect(modifierInfo):
+def CreateEffect(effectInfo, modifierInfo):
     mods = []
     for effectDict in modifierInfo:
         modifierType = effectDict['func']
         mods.append(modifierGetterByType[modifierType](effectDict))
 
-    return ModifierEffect(mods)
+    return ModifierEffect(effectInfo, mods)

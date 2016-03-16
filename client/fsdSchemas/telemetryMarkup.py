@@ -1,4 +1,4 @@
-#Embedded file name: F:\depot\streams\olafurth_olafurth-pc_STABLE_2754\fsdSchemas\telemetryMarkup.py
+#Embedded file name: C:\jamieb_jamieb-pc_STABLE_1796\fsdSchemas\telemetryMarkup.py
 from contextlib import contextmanager
 try:
     import blue

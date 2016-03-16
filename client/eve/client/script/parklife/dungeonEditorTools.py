@@ -1,11 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\parklife\dungeonEditorTools.py
 import math
 from eve.common.script.util.eveCommonUtils import ComputeQuantityFromRadius
-import evecamera
 import trinity
 import dungeonEditorToolGeometry
 import geo2
-import util
 import uix
 import carbonui.const as uiconst
 X_AXIS = geo2.Vector(1.0, 0.0, 0.0)
@@ -194,7 +192,7 @@ class TransformationTool(BaseTool):
          'ww'])
 
     def PickPrimitiveScene(self, x, y):
-        camera = sm.GetService('sceneManager').GetRegisteredCamera(evecamera.CAM_SPACE_PRIMARY)
+        camera = sm.GetService('sceneManager').GetActiveCamera()
         view = trinity.TriView()
         view.transform = camera.viewMatrix.transform
         proj = trinity.TriProjection()

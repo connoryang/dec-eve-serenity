@@ -8,5 +8,4 @@ from .util import repr, Immutable, WeakMethod, extend_class, Extendable
 from .monitor import start_file_monitor, stop_file_monitor
 from .indexer import index
 from .cache import Cache
-from .signal import Signal
 from .storage import Storage, WeakStorage, EveStorage

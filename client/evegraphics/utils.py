@@ -1,18 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\evegraphics\utils.py
 import evetypes
 
-def BlockStarfieldOnLionOSX():
-    import blue
-    if not blue.sysinfo.isTransgaming:
-        return False
-    si = blue.win32.TGGetSystemInfo()
-    if 'platform_minor_version' not in si:
-        return False
-    if int(si['platform_minor_version']) <= 7:
-        return True
-    return False
-
-
 def GetResPathFromGraphicID(graphicID):
     if graphicID is None:
         return

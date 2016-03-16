@@ -10,6 +10,7 @@ from eve.client.script.environment.effects.JumpPortal import JumpPortal, JumpPor
 from eve.client.script.environment.effects.locatorStretchEffect import LocatorStretchEffect
 from eve.client.script.environment.effects.MicroJumpDrive import MicroJumpDriveJump, MicroJumpDriveEngage
 from eve.client.script.environment.effects.orbitalStrike import OrbitalStrike
+from eve.client.script.environment.effects.pointDefense import PointDefense
 from eve.client.script.environment.effects.siegeMode import SiegeMode
 from eve.client.script.environment.effects.skinChange import SkinChange
 from eve.client.script.environment.effects.soundEffect import SoundEffect
@@ -49,6 +50,7 @@ typeToClass = {'AccelerationGate': AccelerationGate,
  'MicroJumpDriveJump': MicroJumpDriveJump,
  'MicroJumpDriveEngage': MicroJumpDriveEngage,
  'OrbitalStrike': OrbitalStrike,
+ 'PointDefense': PointDefense,
  'SiegeMode': SiegeMode,
  'SkinChange': SkinChange,
  'SlashWeapon': SlashWeapon,

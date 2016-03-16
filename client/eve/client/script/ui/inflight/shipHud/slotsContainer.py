@@ -41,6 +41,7 @@ class SlotsContainer(Container):
         self.checkingoverloadrackstate = 0
         self.totalSlaves = 0
         self.myHarpointFlags = []
+        self.groupAllIcon = None
 
     def Close(self):
         Container.Close(self)

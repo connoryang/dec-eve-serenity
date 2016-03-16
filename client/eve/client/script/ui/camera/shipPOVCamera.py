@@ -1,7 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\shipPOVCamera.py
 import math
 import blue
+from eve.client.script.parklife import states
 from eve.client.script.ui.camera.baseSpaceCamera import BaseSpaceCamera
+from eve.client.script.ui.camera.cameraUtil import GetBallPosition
 import evecamera
 import geo2
 
@@ -27,8 +29,13 @@ class ShipPOVCamera(BaseSpaceCamera):
     def UpdateAtEyePositions(self):
         trackPos = self.GetTrackPosition()
         lookDir = self.GetLookDirection()
-        self.atPosition = geo2.Vec3Add(trackPos, geo2.Vec3Scale(lookDir, -self.trackBall.radius))
-        self.eyePosition = geo2.Vec3Add(self.atPosition, lookDir)
+        ballPos = GetBallPosition(self.trackBall)
+        if self.trackBall.model:
+            radius = self.trackBall.model.GetBoundingSphereRadius()
+        else:
+            radius = self.trackBall.radius * 1.2
+        self.eyePosition = geo2.Vec3Add(ballPos, geo2.Vec3Scale(lookDir, -radius))
+        self.atPosition = geo2.Vec3Add(ballPos, geo2.Vec3Scale(lookDir, -2 * radius))
 
     def GetTrackPosition(self):
         trackPos = self.trackBall.GetVectorAt(blue.os.GetSimTime())
@@ -54,29 +61,24 @@ class ShipPOVCamera(BaseSpaceCamera):
     def OnDeactivated(self):
         BaseSpaceCamera.OnDeactivated(self)
         if self.trackBall:
-            self.ShowModel()
             self.trackBall = None
-
-    def ShowModel(self):
-        if self.trackBall and self.trackBall.model:
-            self.trackBall.model.display = True
-
-    def HideModel(self):
-        if self.trackBall and self.trackBall.model:
-            self.trackBall.model.display = False
 
     def OnActivated(self, **kwargs):
         BaseSpaceCamera.OnActivated(self, **kwargs)
+        sm.StartService('state').SetState(self.ego, states.lookingAt, True)
+        settings.char.ui.Set('spaceCameraID', evecamera.CAM_SHIPPOV)
         bp = sm.GetService('michelle').GetBallpark()
-        self.trackBall = bp.GetBall(self.ego)
-        self.HideModel()
+        if bp:
+            self.trackBall = bp.GetBall(self.ego)
 
-    def LookingAt(self):
+    def GetLookAtItemID(self):
         return self.trackBall
 
-    def LookAt(self, itemID, *args):
+    def LookAt(self, itemID, *args, **kwargs):
+        if itemID == self.ego:
+            return
         if not self.CheckObjectTooFar(itemID):
             sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_SHIPORBIT, itemID=itemID)
 
-    def ResetCamera(self):
-        self.LookAt(session.shipid)
+    def ResetCamera(self, *args):
+        pass

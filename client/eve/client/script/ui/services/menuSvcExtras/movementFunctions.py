@@ -90,7 +90,7 @@ def GetDefaultDist(key, itemID = None, minDist = 500, maxDist = 1000000):
 
 
 def KeepAtRange(itemID, followRange = None):
-    if itemID == session.shipid:
+    if _IsInvalidMovementTarget(itemID):
         return
     if followRange is None:
         followRange = GetDefaultDist('KeepAtRange', itemID, minDist=const.approachRange)
@@ -104,7 +104,7 @@ def KeepAtRange(itemID, followRange = None):
 
 
 def Orbit(itemID, followRange = None):
-    if itemID == session.shipid:
+    if _IsInvalidMovementTarget(itemID):
         return
     if followRange is None:
         followRange = GetDefaultDist('Orbit')
@@ -138,6 +138,8 @@ def GetWarpToRanges():
 
 
 def DockOrJumpOrActivateGate(itemID):
+    if _IsInvalidMovementTarget(itemID):
+        return
     bp = sm.StartService('michelle').GetBallpark()
     menuSvc = sm.GetService('menu')
     if bp:
@@ -154,6 +156,10 @@ def DockOrJumpOrActivateGate(itemID):
                 menuSvc.StargateJump(itemID, jump.toCelestialID, jump.locationID)
         elif groupID == const.groupWarpGate:
             menuSvc.ActivateAccelerationGate(itemID)
+
+
+def _IsInvalidMovementTarget(itemID):
+    return itemID == session.shipid or sm.GetService('sensorSuite').IsSiteBall(itemID)
 
 
 def ApproachLocation(bookmark):
@@ -194,6 +200,10 @@ def WarpFleetToBookmark(bookmark, warpRange = 20000.0, fleet = True):
 
 def WarpToItem(itemID, warpRange = None, cancelAutoNavigation = True):
     if itemID == session.shipid:
+        return
+    siteBracket = sm.GetService('sensorSuite').GetBracketByBallID(itemID)
+    if siteBracket:
+        siteBracket.data.WarpToAction(None, warpRange)
         return
     if warpRange is None:
         warprange = sm.GetService('menu').GetDefaultActionDistance('WarpTo')

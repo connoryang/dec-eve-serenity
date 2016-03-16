@@ -52,7 +52,7 @@ def PrepareDrag_Override(dragContainer, dragSource, *args):
                     isCopy = node.rec.singleton == const.singletonBlueprintCopy
             typeID = node.rec.typeID
             MakeTypeIcon(icon, dad, typeID, iconSize, isCopy=isCopy)
-        if guid in ('xtriui.TypeIcon', 'listentry.DraggableItem', 'uicls.GenericDraggableForTypeID', 'listentry.SkillTreeEntry', 'listentry.Item', 'listentry.ContractItemSelect', 'listentry.RedeemToken', 'listentry.FittingModuleEntry', 'listentry.KillItems', 'listentry.CustomsItem'):
+        if guid in ('xtriui.TypeIcon', 'listentry.DraggableItem', 'uicls.GenericDraggableForTypeID', 'listentry.SkillTreeEntry', 'listentry.Item', 'listentry.ContractItemSelect', 'listentry.RedeemToken', 'listentry.FittingModuleEntry', 'listentry.KillItems', 'listentry.CustomsItem', 'uicls.FightersHealthGauge'):
             icon.LoadIconByTypeID(node.typeID)
         elif guid in AllUserEntries():
             charinfo = node.info or cfg.eveowners.Get(node.charID)
@@ -96,6 +96,8 @@ def PrepareDrag_Override(dragContainer, dragSource, *args):
                 node.OnBeginMoveTarget()
         elif getattr(node, 'typeID', None) == typeSkinMaterial:
             icon.LoadIcon(node.texturePath)
+        elif getattr(node, 'LoadIcon', None) is not None:
+            node.LoadIcon(icon, dad, iconSize)
         x += 1
         if x >= 3:
             x = 0

@@ -53,6 +53,10 @@ def GetTimeOffsetInHours():
         return 0
 
 
+def GetDurationInClient(startTime, duration):
+    return duration + (startTime - GetSimTime()) / MSEC
+
+
 class Timer(object):
 
     def __init__(self, GetTime, Sleep, maxSleepTime):

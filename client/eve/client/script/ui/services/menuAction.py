@@ -32,6 +32,7 @@ class ActionMenu(uiprimitives.Container):
          'UI/Inflight/UnlockTarget': ('ui_44_32_17', 0, 0, 0, 1),
          'UI/Inflight/ApproachObject': ('ui_44_32_23', 0, 0, 0, 0),
          'UI/Inflight/LookAtObject': ('ui_44_32_20', 0, 0, 0, 0),
+         'UI/Inflight/SetAsCameraInterest': ('ui_44_32_65', 0, 0, 0, 0),
          'UI/Inflight/ResetCamera': ('ui_44_32_20', 0, 0, 0, 1),
          'UI/Inflight/Submenus/KeepAtRange': ('ui_44_32_22', 0, 0, 1, 0),
          'UI/Inflight/OrbitObject': ('ui_44_32_21', 0, 0, 1, 0),

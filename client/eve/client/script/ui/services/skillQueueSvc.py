@@ -3,7 +3,7 @@ from carbonui.util.various_unsorted import GetAttrs
 import service
 import blue
 import form
-import characterskills.util
+import characterskills as charskills
 import sys
 from textImporting.importSkillplan import ImportSkillPlan
 import uix
@@ -30,7 +30,7 @@ class SkillQueueService(service.Service):
         self.cachedSkillQueue = None
         self.skillQueueCache = None
         self.skillplanImporter = None
-        self.maxSkillqueueTimeLength = characterskills.util.GetSkillQueueTimeLength(session.userType)
+        self.maxSkillqueueTimeLength = charskills.GetSkillQueueTimeLength(session.userType)
 
     def Run(self, memStream = None):
         self.skillQueue, freeSkillPoints = self.skills.GetSkillHandler().GetSkillQueueAndFreePoints()
@@ -57,7 +57,7 @@ class SkillQueueService(service.Service):
                     if idx > 0:
                         startTime = self.skillQueue[idx - 1].trainingEndTime
                     currentSkill = self.skills.GetSkill(trainingSkill.trainingTypeID)
-                    queueEntry = characterskills.util.GetQueueEntry(trainingSkill.trainingTypeID, trainingSkill.trainingToLevel, idx, currentSkill, queueWithTimestamps, lambda x, y: self.GetTimeForTraining(x, y, startTime), KeyVal, True)
+                    queueEntry = charskills.GetQueueEntry(trainingSkill.trainingTypeID, trainingSkill.trainingToLevel, idx, currentSkill, queueWithTimestamps, lambda x, y: self.GetTimeForTraining(x, y, startTime), KeyVal, True)
                     queueWithTimestamps.append(queueEntry)
 
                 self.skillQueue = queueWithTimestamps
@@ -78,7 +78,7 @@ class SkillQueueService(service.Service):
         finally:
             UnLock('SkillQueueSvc:xActLock')
 
-    def CommitTransaction(self):
+    def CommitTransaction(self, activate = True):
         Lock('SkillQueueSvc:xActLock')
         try:
             if self.cachedSkillQueue is None:
@@ -102,7 +102,7 @@ class SkillQueueService(service.Service):
                 queueInfo = {idx:(x.trainingTypeID, x.trainingToLevel) for idx, x in enumerate(self.skillQueue)}
                 if hasChanges or len(self.skillQueue) and self.SkillInTraining() is None:
                     scatterEvent = True
-                    skillHandler.SaveNewQueue(queueInfo, True)
+                    skillHandler.SaveNewQueue(queueInfo, activate)
             except UserError as e:
                 if e.msg == 'UserAlreadyHasSkillInTraining':
                     scatterEvent = True
@@ -137,11 +137,38 @@ class SkillQueueService(service.Service):
                     elif lvl > skillLevel and lvlPosition < position:
                         raise UserError('QueueCannotPlaceSkillLevelsOutOfOrder')
 
-            if position > 0 and performLengthTest:
+            if position >= 0 and performLengthTest:
                 if self.GetTrainingLengthOfQueue(position) > self.maxSkillqueueTimeLength:
                     raise UserError('QueueTooLong')
+            if mySkill.skillPoints == 0:
+                requirements = sm.GetService('skills').GetRequiredSkills(skillTypeID)
+                for requiredTypeID, requiredLevel in requirements.iteritems():
+                    isRequirementsQueued = False
+                    if requiredTypeID in self.skillQueueCache:
+                        for level, queuedPosition in self.skillQueueCache[requiredTypeID].iteritems():
+                            if level <= requiredLevel and queuedPosition > position:
+                                raise UserError('QueueCannotPlaceSkillBeforeRequirements')
+                            if level == requiredLevel and queuedPosition < position:
+                                isRequirementsQueued = True
+
+                    skill = self.skills.GetSkill(requiredTypeID)
+                    if skill is None:
+                        raise UserError('QueueCannotPlaceSkillBeforeRequirements')
+                    isRequirementsTrained = skill.skillLevel >= requiredLevel
+                    if not isRequirementsTrained and not isRequirementsQueued:
+                        raise UserError('QueueCannotPlaceSkillBeforeRequirements')
+
+            dependencies = sm.GetService('skills').GetDependentSkills(skillTypeID)
+            for dependentTypeID, requiredLevel in dependencies.iteritems():
+                if dependentTypeID not in self.skillQueueCache:
+                    continue
+                for level, queuedPosition in self.skillQueueCache[dependentTypeID].iteritems():
+                    if requiredLevel == skillLevel and queuedPosition < position:
+                        raise UserError('QueueCannotPlaceSkillAfterDependentSkills')
+
         except UserError as ue:
-            if check and ue.msg in ('QueueTooLong', 'QueueCannotPlaceSkillLevelsOutOfOrder', 'QueueCannotTrainPreviouslyTrainedSkills', 'QueueSkillNotUploaded'):
+            checkedErrors = ('QueueCannotPlaceSkillAfterDependentSkills', 'QueueCannotPlaceSkillBeforeRequirements', 'QueueCannotPlaceSkillLevelsOutOfOrder', 'QueueCannotTrainPreviouslyTrainedSkills', 'QueueSkillNotUploaded', 'QueueTooLong')
+            if check and ue.msg in checkedErrors:
                 sys.exc_clear()
                 ret = False
             else:
@@ -153,34 +180,45 @@ class SkillQueueService(service.Service):
         if self.FindInQueue(skillTypeID, skillLevel) is not None:
             raise UserError('QueueSkillAlreadyPresent')
         skillQueueLength = len(self.skillQueue)
-        if skillQueueLength >= characterskills.util.SKILLQUEUE_MAX_NUM_SKILLS:
-            raise UserError('QueueTooManySkills', {'num': characterskills.util.SKILLQUEUE_MAX_NUM_SKILLS})
+        if skillQueueLength >= charskills.SKILLQUEUE_MAX_NUM_SKILLS:
+            raise UserError('QueueTooManySkills', {'num': charskills.SKILLQUEUE_MAX_NUM_SKILLS})
         newPos = position if position is not None and position >= 0 else skillQueueLength
         currentSkill = self.skills.GetSkill(skillTypeID)
         self.CheckCanInsertSkillAtPosition(skillTypeID, skillLevel, newPos)
         startTime = None
         if newPos != 0:
             startTime = self.skillQueue[newPos - 1].trainingEndTime
-        queueEntry = characterskills.util.GetQueueEntry(skillTypeID, skillLevel, newPos, currentSkill, self.skillQueue, lambda x, y: self.GetTimeForTraining(x, y, startTime), KeyVal, self.SkillInTraining() is not None)
+        queueEntry = charskills.GetQueueEntry(skillTypeID, skillLevel, newPos, currentSkill, self.skillQueue, lambda x, y: self.GetTimeForTraining(x, y, startTime), KeyVal, self.SkillInTraining() is not None)
         if newPos == skillQueueLength:
             self.skillQueue.append(queueEntry)
-            self.AddToCache(skillTypeID, skillLevel, newPos)
         else:
             if newPos > skillQueueLength:
                 raise UserError('QueueInvalidPosition')
-            self.skillQueueCache = None
             self.skillQueue.insert(newPos, queueEntry)
-            self.TrimQueue(True)
+            for entry in self.skillQueue[newPos + 1:]:
+                entry.queuePosition += 1
+
+            self.skillQueueCache = None
+        self.AddToCache(skillTypeID, skillLevel, newPos)
+        self.TrimQueue(True)
         return newPos
 
     def RemoveSkillFromQueue(self, skillTypeID, skillLevel):
-        self.PrimeCache()
-        if skillTypeID in self.skillQueueCache:
-            for cacheLevel in self.skillQueueCache[skillTypeID]:
-                if cacheLevel > skillLevel:
-                    raise UserError('QueueCannotRemoveSkillsWithHigherLevelsStillInQueue')
-
+        self.CheckCanRemoveSkillFromQueue(skillTypeID, skillLevel)
         self.InternalRemoveFromQueue(skillTypeID, skillLevel)
+
+    def CheckCanRemoveSkillFromQueue(self, skillTypeID, skillLevel):
+        self.PrimeCache()
+        if skillTypeID not in self.skillQueueCache:
+            return
+        for cacheLevel in self.skillQueueCache[skillTypeID]:
+            if cacheLevel > skillLevel:
+                raise UserError('QueueCannotRemoveSkillsWithHigherLevelsStillInQueue')
+
+        dependencies = sm.GetService('skills').GetDependentSkills(skillTypeID)
+        for dependentTypeID, requiredLevel in dependencies.iteritems():
+            if skillLevel <= requiredLevel and dependentTypeID in self.skillQueueCache:
+                raise UserError('QueueCannotRemoveSkillsWithDependentSkillsInQueue')
 
     def FindInQueue(self, skillTypeID, skillLevel):
         self.PrimeCache()
@@ -286,7 +324,7 @@ class SkillQueueService(service.Service):
         if skillTimeConstant is None:
             self.LogWarn('GetTrainingLengthOfSkillInEnvironment could not find skill type ID:', skillTypeID, 'via Godma')
             return 0
-        skillPointsToTrain = characterskills.util.GetSPForLevelRaw(skillTimeConstant, skillLevel) - playerCurrentSP
+        skillPointsToTrain = charskills.GetSPForLevelRaw(skillTimeConstant, skillLevel) - playerCurrentSP
         if skillPointsToTrain <= 0:
             return (0, 0)
         attrDict = playerAttributeDict
@@ -296,7 +334,7 @@ class SkillQueueService(service.Service):
         playerSecondaryAttribute = attrDict[secondaryAttributeID]
         if playerPrimaryAttribute <= 0 or playerSecondaryAttribute <= 0:
             raise RuntimeError('GetTrainingLengthOfSkillInEnvironment found a zero attribute value on character', session.charid, 'for attributes [', primaryAttributeID, secondaryAttributeID, ']')
-        trainingRate = characterskills.util.GetSkillPointsPerMinute(playerPrimaryAttribute, playerSecondaryAttribute)
+        trainingRate = charskills.GetSkillPointsPerMinute(playerPrimaryAttribute, playerSecondaryAttribute)
         trainingTimeInMinutes = float(skillPointsToTrain) / float(trainingRate)
         return (skillPointsToTrain, trainingTimeInMinutes * const.MIN)
 
@@ -328,12 +366,12 @@ class SkillQueueService(service.Service):
     def GetAttributeBooster(self):
         myGodmaItem = sm.GetService('godma').GetItem(session.charid)
         boosters = myGodmaItem.boosters
-        return characterskills.util.FindAttributeBooster(self.godma, boosters)
+        return charskills.FindAttributeBooster(self.godma, boosters)
 
     def GetAttributesWithoutCurrentBooster(self, booster):
         currentAttributes = self.GetPlayerAttributeDict()
         for attributeID, value in currentAttributes.iteritems():
-            newValue = characterskills.util.GetBoosterlessValue(self.godma, booster.typeID, attributeID, value)
+            newValue = charskills.GetBoosterlessValue(self.godma, booster.typeID, attributeID, value)
             currentAttributes[attributeID] = newValue
 
         return currentAttributes
@@ -343,7 +381,7 @@ class SkillQueueService(service.Service):
             currentAttributes = self.GetPlayerAttributeDict()
         isAccelerated = False
         if attributeBooster:
-            if characterskills.util.IsBoosterExpiredThen(long(trainingTimeOffset), attributeBooster.expiryTime):
+            if charskills.IsBoosterExpiredThen(long(trainingTimeOffset), attributeBooster.expiryTime):
                 currentAttributes = self.GetAttributesWithoutCurrentBooster(attributeBooster)
             else:
                 isAccelerated = True
@@ -369,6 +407,42 @@ class SkillQueueService(service.Service):
             resultsDict[queueSkillTypeID, queueSkillLevel] = (trainingTime, addedTime, isAccelerated)
 
         return resultsDict
+
+    def ApplyFreeSkillPointsToQueue(self):
+        handler = sm.GetService('skills').GetSkillHandler()
+        pointsBySkillTypeID = handler.GetFreeSkillPointsAppliedToQueue()
+        if not pointsBySkillTypeID:
+            return
+        levelAndProgressBySkillTypeID = self._GetSkillLevelAndProgressWithFreePoints(pointsBySkillTypeID)
+        skillEntries = []
+        for typeID, (level, progress) in levelAndProgressBySkillTypeID.iteritems():
+            label = evetypes.GetName(typeID) + ' '
+            if progress > 0.0:
+                extra = '{}%'.format(int(progress * 100))
+                label += localization.GetByLabel('UI/SkillQueue/Skills/SkillLevelWordAndValueWithExtra', skillLevel=level, extra=extra)
+            else:
+                label += localization.GetByLabel('UI/SkillQueue/Skills/SkillLevelWordAndValue', skillLevel=level)
+            skillEntries.append(label)
+
+        totalFreePointsApplied = sum(pointsBySkillTypeID.values())
+        key = 'ConfirmApplyFreeSkillPointsToQueue'
+        parameters = {'skills': '<br>'.join(sorted(skillEntries, key=lambda x: x.lower())),
+         'totalPoints': totalFreePointsApplied}
+        if eve.Message(key, parameters, uiconst.YESNO) == uiconst.ID_YES:
+            handler.ApplyFreeSkillPointsToQueue()
+
+    def _GetSkillLevelAndProgressWithFreePoints(self, pointsBySkillTypeID):
+        skillSvc = sm.GetService('skills')
+        levelBySkillTypeID = {}
+        for typeID, points in pointsBySkillTypeID.iteritems():
+            currentPoints = skillSvc.MySkillPoints(typeID)
+            totalPoints = currentPoints + points
+            rank = skillSvc.GetSkillRank(typeID)
+            level = charskills.GetSkillLevelRaw(totalPoints, rank)
+            progress = charskills.GetLevelProgress(totalPoints, rank)
+            levelBySkillTypeID[typeID] = (level, progress)
+
+        return levelBySkillTypeID
 
     def InternalRemoveFromQueue(self, skillTypeID, skillLevel):
         if not len(self.skillQueue):
@@ -423,15 +497,13 @@ class SkillQueueService(service.Service):
 
     def OnServerSkillsChanged(self, skillInfos):
         self.PrimeCache()
-        sanitizedSkills = {}
         for skillTypeID, skillInfo in skillInfos.iteritems():
             skill = self.skills.GetSkill(skillTypeID)
             if not skill and skillInfo.skillLevel > 0:
                 self.LogError('skillQueueSvc::OnServerSkillsChanged skill %s not found' % skillTypeID)
                 continue
-            sanitizedSkills[skillTypeID] = skillInfo
             skillLevel = skillInfo.skillLevel
-            if skillTypeID in self.skillQueueCache:
+            if self.skillQueueCache and skillTypeID in self.skillQueueCache:
                 if skillLevel in self.skillQueueCache[skillTypeID]:
                     self.InternalRemoveFromQueue(skillTypeID, skillLevel)
             if self.cachedSkillQueue:
@@ -490,7 +562,7 @@ class SkillQueueService(service.Service):
 
     def AddSkillToEnd(self, skillTypeID, current, nextLevel = None):
         queueLength = self.GetNumberOfSkillsInQueue()
-        if queueLength >= characterskills.util.SKILLQUEUE_MAX_NUM_SKILLS:
+        if queueLength >= charskills.SKILLQUEUE_MAX_NUM_SKILLS:
             raise UserError('CustomNotify', {'notify': localization.GetByLabel('UI/SkillQueue/QueueIsFull')})
         totalTime = self.GetTrainingLengthOfQueue()
         if totalTime > self.maxSkillqueueTimeLength:
@@ -593,8 +665,9 @@ class SkillQueueService(service.Service):
         return m
 
     def UseFreeSkillPoints(self, skillTypeID, diff):
-        if self.SkillInTraining():
-            eve.Message('CannotApplyFreePointsWhileQueueActive')
+        inTraining = self.SkillInTraining()
+        if inTraining is not None and inTraining.typeID == skillTypeID:
+            eve.Message('CannotApplyFreePointsWhileTrainingSkill')
             return
         freeSkillPoints = sm.StartService('skills').GetFreeSkillPoints()
         text = localization.GetByLabel('UI/SkillQueue/AddSkillMenu/UseSkillPointsWindow', skill=skillTypeID, skillPoints=int(diff))
@@ -604,6 +677,7 @@ class SkillQueueService(service.Service):
             return
         sp = int(ret.get('qty', ''))
         sm.StartService('skills').ApplyFreeSkillPoints(skillTypeID, sp)
+        sm.GetService('audio').SendUIEvent('st_allocate_skillpoints_play')
 
     def SkillInTraining(self, skillTypeID = None):
         activeQueue = self.GetServerQueue()
@@ -624,7 +698,7 @@ class SkillQueueService(service.Service):
             skill = self.skills.GetSkill(skillTypeID)
             attributes = self.GetPlayerAttributeDict()
             booster = self.GetAttributeBooster()
-            if booster and characterskills.util.IsBoosterExpiredThen(timeOffset, booster.expiryTime):
+            if booster and charskills.IsBoosterExpiredThen(timeOffset, booster.expiryTime):
                 attributes = self.GetAttributesWithoutCurrentBooster(booster)
             skillDict[skillTypeID] = self.GetSkillPointsFromSkillObject(skillTypeID, skill)
             _, timeForTraining = self.GetTrainingParametersOfSkillInEnvironment(skillTypeID, toLevel, skillDict[skillTypeID], attributes)
@@ -677,6 +751,13 @@ class SkillQueueService(service.Service):
             skill = sm.StartService('skills').GetSkill(typeID)
             level = self.FindNextLevel(typeID, skill.skillLevel, queue)
             return self.CheckCanInsertSkillAtPosition(typeID, level, checkedIdx, check=1, performLengthTest=False)
+
+    def IsRemoveAllowed(self, typeID, level):
+        try:
+            self.CheckCanRemoveSkillFromQueue(typeID, level)
+            return True
+        except UserError:
+            return False
 
     def GetSkillPlanImporter(self):
         if self.skillplanImporter is None:

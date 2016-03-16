@@ -210,6 +210,14 @@ class ScanResultNew(BaseListEntryCustomColumns):
             return self.sr.node.GetMenu(self)
         return []
 
+    def GetHint(self):
+        node = self.sr.node
+        return '%s %s %s %s %s' % (FmtDist(node.distance),
+         node.result.id,
+         node.scanGroupName,
+         node.groupName,
+         localization.GetByLabel('UI/Common/Percentage', percentage=node.result.certainty * 100))
+
     def OnColumnResize(self, newCols):
         for i, width in enumerate(newCols):
             if self.columns[i].align != uiconst.TOALL:
@@ -250,11 +258,14 @@ class ScanResultNew(BaseListEntryCustomColumns):
 
     @staticmethod
     def GetColumnsMinSize():
+        return {localization.GetByLabel('UI/Common/Distance'): 50,
+         localization.GetByLabel('UI/Common/ID'): 30,
+         localization.GetByLabel('UI/Common/Name'): 70,
+         localization.GetByLabel('UI/Common/Group'): 70}
+
+    @staticmethod
+    def GetColumnsDefaultSize():
         return {localization.GetByLabel('UI/Common/Distance'): 70,
          localization.GetByLabel('UI/Common/ID'): 60,
          localization.GetByLabel('UI/Common/Name'): 100,
          localization.GetByLabel('UI/Common/Group'): 100}
-
-    @staticmethod
-    def GetColumnsDefaultSize():
-        return ScanResultNew.GetColumnsMinSize()

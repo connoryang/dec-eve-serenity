@@ -76,6 +76,7 @@ def GetMultiFunctionList():
      'UI/Inventory/ItemActions/AssembleShip',
      'UI/Inventory/ItemActions/FitToActiveShip',
      'UI/Commands/OpenDroneBay',
+     'UI/Commands/OpenFighterBay',
      'UI/Commands/OpenCargoHold',
      'UI/Inventory/ItemActions/LaunchForSelf',
      'UI/Inventory/ItemActions/LaunchForCorp',

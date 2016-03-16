@@ -10,13 +10,13 @@ import dogma.const as dogmaConst
 from eve.client.script.ui.shared.fittingGhost.controllerGhostFittingExtension import FittingControllerGhostFittingExtension
 from eve.client.script.ui.util.uix import skillfittingTutorial
 from evegraphics.utils import BuildSOFDNAFromTypeID
-from fsdlite.signal import Signal
 from inventorycommon.util import IsShipFittingFlag, IsModularShip
 import shipmode
 import carbonui.const as uiconst
 import inventorycommon.const as invConst
 import inventorycommon.typeHelpers
 import evetypes
+import signals
 
 class FittingController(object):
     __notifyevents__ = ['OnDogmaAttributeChanged',
@@ -27,16 +27,12 @@ class FittingController(object):
      'ProcessActiveShipChanged',
      'OnFittingUpdateStatsNeeded',
      'OnPostCfgDataChanged']
-    SLOTGROUPS = (invConst.hiSlotFlags,
-     invConst.medSlotFlags,
-     invConst.loSlotFlags,
-     invConst.subSystemSlotFlags,
-     invConst.rigSlotFlags)
-    SLOTGROUP_LAYOUT_ARCS = ((-35.0, 82.0),
-     (54.0, 82.0),
-     (143.0, 82.0),
-     (233.0, 51.0),
-     (287.0, 31.0))
+    SLOTGROUPS = ()
+    SLOTGROUP_LAYOUT_ARCS = {0: (-35.0, 82.0),
+     1: (54.0, 82.0),
+     2: (143.0, 82.0),
+     3: (233.0, 51.0),
+     4: (287.0, 31.0)}
     SLOT_CLASS = FittingSlotController
 
     def __init__(self, itemID, typeID = None):
@@ -47,16 +43,18 @@ class FittingController(object):
         self.SetDogmaLocation()
         self.ghostFittedItem = None
         self._skinMaterialSetID = None
-        self.on_new_itemID = Signal()
-        self.on_stats_changed = Signal()
-        self.on_hardpoints_fitted = Signal()
-        self.on_subsystem_fitted = Signal()
-        self.on_module_online_state = Signal()
-        self.on_item_ghost_fitted = Signal()
-        self.on_name_changed = Signal()
-        self.on_skin_material_changed = Signal()
-        self.on_stance_activated = Signal()
+        self.on_new_itemID = signals.Signal()
+        self.on_stats_changed = signals.Signal()
+        self.on_hardpoints_fitted = signals.Signal()
+        self.on_subsystem_fitted = signals.Signal()
+        self.on_module_online_state = signals.Signal()
+        self.on_item_ghost_fitted = signals.Signal()
+        self.on_name_changed = signals.Signal()
+        self.on_skin_material_changed = signals.Signal()
+        self.on_stance_activated = signals.Signal()
+        self.on_slots_with_menu_changed = signals.Signal()
         self.slotsByFlagID = {}
+        self.slotFlagWithMenu = None
         self.ConstructSlotControllers()
         self._UpdateSkinMaterial()
 
@@ -72,8 +70,8 @@ class FittingController(object):
             slot.Close()
 
         self.slotsByFlagID = {}
-        self.slotsByGroups = []
-        for flagIDs in self.SLOTGROUPS:
+        self.slotsByGroups = {}
+        for groupIdx, flagIDs in self.SLOTGROUPS:
             group = []
             for i, flagID in enumerate(flagIDs):
                 invItem = self.GetFittedModulesByFlagID().get(flagID, None)
@@ -81,7 +79,7 @@ class FittingController(object):
                 self.slotsByFlagID[flagID] = slotController
                 group.append(slotController)
 
-            self.slotsByGroups.append(group)
+            self.slotsByGroups[groupIdx] = group
 
         self._UpdateSlots()
 
@@ -89,7 +87,7 @@ class FittingController(object):
         return self.slotsByGroups
 
     def GetTotalNumSlots(self):
-        return sum([ len(group) for group in self.slotsByGroups ])
+        return sum([ len(group) for group in self.slotsByGroups.itervalues() ])
 
     def _UpdateSlots(self):
         for flagID, slot in self.slotsByFlagID.iteritems():
@@ -497,6 +495,16 @@ class FittingController(object):
     def GetCurrentAttributeValues(self):
         return {}
 
+    def SetSlotWithMenu(self, newFlagID):
+        oldFlagID = self.slotFlagWithMenu
+        self.slotFlagWithMenu = newFlagID
+        self.on_slots_with_menu_changed(oldFlagID, newFlagID)
+
 
 class ShipFittingController(FittingController):
     SLOT_CLASS = ShipFittingSlotController
+    SLOTGROUPS = ((0, invConst.hiSlotFlags),
+     (1, invConst.medSlotFlags),
+     (2, invConst.loSlotFlags),
+     (3, invConst.subSystemSlotFlags),
+     (4, invConst.rigSlotFlags))

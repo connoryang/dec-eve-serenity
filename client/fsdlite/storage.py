@@ -15,7 +15,6 @@ class Storage(collections.MutableMapping):
 
     def __init__(self, data = None, cache = None, mapping = None, indexes = None, monitor = False, coerce = None):
         self.extension = '.staticdata'
-        self.on_update = fsdlite.Signal()
         self.cache_path = cache
         self.coerce = coerce or str
         self.immutable = True
@@ -28,6 +27,7 @@ class Storage(collections.MutableMapping):
         self._indexes = indexes
         self._file_init()
         self.monitor = monitor
+        self.waiting = False
 
     def __getitem__(self, key):
         if key is None:
@@ -229,7 +229,7 @@ class Storage(collections.MutableMapping):
         if key:
             self._object_discard(key)
             self._cache_discard(key)
-            self.on_update(key)
+            self.waiting = False
 
     def _file_load(self, key):
         if self.path:
@@ -291,6 +291,11 @@ class Storage(collections.MutableMapping):
             self.file_monitor = fsdlite.start_file_monitor(self.path, fsdlite.WeakMethod(self._file_changed))
 
     monitor = property(_get_monitor, _set_monitor)
+
+    def wait(self):
+        self.waiting = True
+        while self.waiting:
+            pass
 
 
 class WeakStorage(Storage):

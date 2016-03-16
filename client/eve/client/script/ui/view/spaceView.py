@@ -89,22 +89,10 @@ class SpaceView(View):
             self.bracket.ShowAllHidden()
         return 1
 
-    def ToggleCamera(self):
-        sceneMan = sm.GetService('sceneManager')
-        camera = sceneMan.GetActiveCamera()
-        if camera.cameraID == evecamera.CAM_TACTICAL:
-            sceneMan.SetActiveCameraByID(evecamera.CAM_SHIPPOV)
-        elif camera.cameraID == evecamera.CAM_SHIPPOV:
-            sceneMan.SetActiveCameraByID(evecamera.CAM_SHIPORBIT)
-        elif camera.cameraID == evecamera.CAM_SHIPORBIT:
-            if not camera.trackBall or camera.trackBall.id != session.shipid:
-                camera.LookAt(session.shipid)
-            else:
-                sceneMan.SetActiveCameraByID(evecamera.CAM_TACTICAL)
-
     def OnActiveCameraChanged(self, cameraID):
         if IsNewCameraActive():
-            if cameraID == evecamera.CAM_TACTICAL:
-                sm.GetService('tactical').ShowTacticalOverlay()
+            tacticalSvc = sm.GetService('tactical')
+            if tacticalSvc.IsTacticalOverlayActive():
+                tacticalSvc.ShowTacticalOverlay()
             else:
-                sm.GetService('tactical').HideTacticalOverlay()
+                tacticalSvc.HideTacticalOverlay()

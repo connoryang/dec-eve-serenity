@@ -5,7 +5,7 @@ import os
 import sys
 import time
 import osutils
-import threadutils
+import signals
 import uthread2 as uthread
 import win32api
 import zipfileutils
@@ -15,8 +15,8 @@ log = logging.getLogger(__name__)
 class FolderReloaderSpy(object):
 
     def __init__(self, waitables, paths, translationPaths = None):
-        self.on_file_reloaded = threadutils.Signal('(filename, module)')
-        self.on_file_reload_failed = threadutils.Signal('(filename, exc_info)')
+        self.on_file_reloaded = signals.Signal()
+        self.on_file_reload_failed = signals.Signal()
         self.runningCheckAt = 0
         self.startedAt = int(time.time())
         self.processed = {}
@@ -84,7 +84,7 @@ class FolderReloaderSpy(object):
                 code = compile(source, filename, 'exec')
                 log.info('Reloading %s', module)
                 xreload(module, code)
-                self.on_file_reloaded.emit(filename, module)
+                self.on_file_reloaded(filename, module)
 
     ReloadFile = reload_file
 
@@ -125,7 +125,7 @@ class FolderReloaderSpy(object):
                     log.info('Took %.3fs to reload %s', tdiff, os.path.basename(sourceFile))
                 except Exception:
                     log.exception("ReloadFile failed for '%s'.", sourceFile)
-                    self.on_file_reload_failed.emit(sourceFile, sys.exc_info())
+                    self.on_file_reload_failed(sourceFile, sys.exc_info())
 
     ProcessFolder = process_folder
 

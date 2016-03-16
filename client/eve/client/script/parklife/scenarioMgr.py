@@ -1,4 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\parklife\scenarioMgr.py
+import evecamera
 import evetypes
 import service
 import uthread
@@ -702,10 +703,16 @@ class ScenarioMgr(service.Service):
             self.cursors[self.currentCursor].Hide()
         self.isActive = False
 
+    def DetachTacticalCamera(self):
+        cam = sm.GetService('sceneManager').GetActiveCamera()
+        if cam.cameraID == evecamera.CAM_TACTICAL:
+            cam.Detach()
+
     def MoveCursor(self, tf, dx, dy, camera):
         if not self.isMoving:
             self.LogInfo('ScenarioMgr: MoveCursor')
             uthread.new(self.MoveCursor_thread).context = 'svc.scenario.MoveCursor'
+            self.DetachTacticalCamera()
 
     def MoveCursor_thread(self):
         self.isMoving = True

@@ -4,7 +4,7 @@ import eve.client.script.ui.shared.mapView.mapViewConst as mapViewConst
 from eve.client.script.ui.shared.mapView.markers.mapMarkerBase_Label import MarkerLabelBase
 
 class MarkerLabelRegion(MarkerLabelBase):
-    distanceFadeAlphaNearFar = (mapViewConst.MAX_MARKER_DISTANCE * 0.015, mapViewConst.MAX_MARKER_DISTANCE * 0.75)
+    distanceFadeAlphaNearFar = (mapViewConst.MAX_MARKER_DISTANCE * 0.015, mapViewConst.MAX_MARKER_DISTANCE * 1.25)
     fontSize = 10
     letterSpace = 3
 
@@ -22,3 +22,9 @@ class MarkerLabelRegion(MarkerLabelBase):
     def Load(self):
         MarkerLabelBase.Load(self)
         self.projectBracket.offsetY = -ScaleDpi(self.markerContainer.height + 20)
+
+    def UpdateActiveAndHilightState(self):
+        if self.hilightState or self.activeState:
+            self.projectBracket.maxDispRange = 1e+32
+        elif self.distanceFadeAlphaNearFar:
+            self.projectBracket.maxDispRange = self.distanceFadeAlphaNearFar[1]

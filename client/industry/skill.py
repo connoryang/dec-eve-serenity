@@ -1,4 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\industry\skill.py
+import signals
 import fsdlite
 import industry
 
@@ -10,8 +11,8 @@ class Skill(industry.Base):
         obj._typeID = None
         obj._level = None
         obj._errors = []
-        obj.on_updated = fsdlite.Signal()
-        obj.on_errors = fsdlite.Signal()
+        obj.on_updated = signals.Signal()
+        obj.on_errors = signals.Signal()
         return obj
 
     typeID = industry.Property('_typeID', 'on_updated')

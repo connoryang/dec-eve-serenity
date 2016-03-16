@@ -297,8 +297,6 @@ class TargetingHairlines:
         l, r = uicore.layer.sidePanels.GetSideOffset()
         x += uicore.ScaleDpi(l)
         midPoint = (int(x + bracket.width / 2.0), int(y + bracket.height / 2.0))
-        if not settings.user.ui.Get('modulesExpanded', True):
-            startPoint = midPoint
         return (startPoint, midPoint, endPoint)
 
     def StartAnimation(self, reverse = False, *args):

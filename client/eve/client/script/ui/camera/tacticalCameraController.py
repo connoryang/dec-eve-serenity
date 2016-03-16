@@ -1,6 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\tacticalCameraController.py
 import math
-from eve.client.script.ui.camera.cameraUtil import SetShipDirection, GetZoomDz
+from eve.client.script.ui.camera.cameraUtil import SetShipDirection, GetZoomDz, CheckInvertZoom
 from eve.client.script.ui.camera.baseCameraController import BaseCameraController
 import evecamera
 import geo2
@@ -13,18 +13,23 @@ class TacticalCameraController(BaseCameraController):
         camera = self.GetCamera()
         if uicore.uilib.leftbtn and uicore.uilib.rightbtn:
             k = 200.0
-            camera.Pan(0, 0, -k * uicore.uilib.dy)
+            if camera.IsAttached():
+                camera.Zoom(-0.005 * CheckInvertZoom(uicore.uilib.dy))
+                if math.fabs(uicore.uilib.dx) > 1:
+                    camera.Orbit(0.01 * uicore.uilib.dx, 0.0)
+            else:
+                camera.Pan(0, 0, -k * CheckInvertZoom(uicore.uilib.dy))
         elif uicore.uilib.rightbtn:
             k = 10 * (3.0 + camera.GetZoomDistance() / camera.minZoom)
             camera.Pan(-k * uicore.uilib.dx, k * uicore.uilib.dy, 0)
         elif uicore.uilib.leftbtn:
-            k = 0.005
+            k = evecamera.ORBIT_MOVE_DIST
             camera.Orbit(k * uicore.uilib.dx, k * uicore.uilib.dy)
 
     def OnMouseWheel(self, *args):
         camera = self.GetCamera()
         dz = GetZoomDz()
-        if camera.lastLookAtID:
+        if camera.IsAttached():
             k = 0.0005
             camera.Zoom(k * dz)
         else:

@@ -2,6 +2,7 @@
 import math
 import sys
 import evetypes
+from spacecomponents.client.messages import MSG_ON_LOAD_OBJECT
 import states as state
 import service
 import uicontrols
@@ -129,6 +130,13 @@ class SpaceMgr(service.Service):
         except Exception:
             log.LogException('Error adding SpaceObject of type', str(ob.__klass__), 'to scene')
             sys.exc_clear()
+
+        self._NotifyComponents(ball)
+
+    def _NotifyComponents(self, ball):
+        bp = self.michelle.GetBallpark()
+        if bp:
+            bp.GetComponentRegistry().SendMessageToItem(ball.id, MSG_ON_LOAD_OBJECT, ball)
 
     def HandleAsteroidParticles(self):
         if not (gfxsettings.Get(gfxsettings.UI_ASTEROID_ATMOSPHERICS) and gfxsettings.Get(gfxsettings.UI_ASTEROID_PARTICLES)):

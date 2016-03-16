@@ -89,14 +89,11 @@ class ClientStatsSvc(service.Service):
             self.osPlatform = PLATFORM_WINDOWS
             if blue.sysinfo.isTransgaming:
                 self.osPlatform = PLATFORM_MACOS
-            else:
-                import ctypes
-                try:
-                    wine = ctypes.windll.ntdll.wine_get_version
-                    self.osPlatform = PLATFORM_LINUX
-                except AttributeError:
-                    pass
-
+            elif blue.sysinfo.isWine:
+                if blue.sysinfo.wineHostOs.startswith('Darwin'):
+                    self.osPlatform = PLATFORM_MACOS_WINE
+                else:
+                    self.osPlatform = PLATFORM_LINUX_WINE
         except Exception:
             pass
 

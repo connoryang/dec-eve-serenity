@@ -40,6 +40,7 @@ class CQView(StationView):
         self.cachedPlayerPitch = None
         self.cachedPlayerZoom = None
         self.hangarTraffic = hangarUtil.HangarTraffic()
+        self.__alreadyShowingActiveShip = False
 
     def LoadView(self, change = None, **kwargs):
         settings.user.ui.Set('defaultDockingView', 'station')
@@ -182,8 +183,8 @@ class CQView(StationView):
             stationModel.enableShadow = False
 
     def ShowActiveShip(self, *args):
-        if getattr(self, '__alreadyShowingActiveShip', False):
-            log.LogTraceback("We're already in the process of showing the active ship")
+        if self.__alreadyShowingActiveShip:
+            log.LogWarn("We're already in the process of showing the active ship")
             return
         self.__alreadyShowingActiveShip = True
         try:

@@ -23,5 +23,11 @@ class MarkerLabelConstellation(MarkerLabelBase):
          ReverseScaleDpi(self.textSprite.textWidth + 12),
          ReverseScaleDpi(self.textSprite.textHeight + 4))
         self.projectBracket.offsetY = -ScaleDpi(self.markerContainer.height + 8)
-        Frame(bgParent=self.markerContainer, color=self.fontColor, blendMode=trinity.TR2_SBM_ADD)
+        Frame(bgParent=self.markerContainer, color=self.fontColor)
         Fill(bgParent=self.markerContainer, color=(0, 0, 0, 0.5))
+
+    def UpdateActiveAndHilightState(self):
+        if self.hilightState or self.activeState:
+            self.projectBracket.maxDispRange = 1e+32
+        elif self.distanceFadeAlphaNearFar:
+            self.projectBracket.maxDispRange = self.distanceFadeAlphaNearFar[1]

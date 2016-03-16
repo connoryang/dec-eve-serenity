@@ -1,7 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\util\uiComponents.py
 import functools
 import math
-from threadutils import Signal
+import signals
 import carbonui.const as uiconst
 from carbonui.primitives.fill import Fill
 from carbonui.primitives.gradientSprite import GradientSprite
@@ -12,13 +12,16 @@ logger = logging.getLogger(__name__)
 def Component(component):
 
     def AttachComponent(cls):
+        if not hasattr(cls, '_attached_ui_components'):
+            setattr(cls, '_attached_ui_components', [])
+        cls._attached_ui_components.append(component)
         for methodName in component.__observed_methods__:
             method = getattr(cls, methodName, None)
             if method is None:
                 continue
             signal = getattr(method, '_component_method_observers', None)
             if signal is None:
-                signal = Signal()
+                signal = signals.Signal()
 
                 def GetWrapper(_method, _signal):
 
@@ -31,7 +34,7 @@ def Component(component):
                             raise
 
                         try:
-                            _signal.emit(*args, **kwargs)
+                            _signal(*args, **kwargs)
                         except Exception:
                             logger.exception('Failed while notifying observers for method %s', methodName)
 
@@ -175,11 +178,12 @@ class HoverEffect:
      'OnMouseExit',
      'OnClick']
 
-    def __init__(self, padding = (1, 1, 1, 1), color = (1.0, 1.0, 1.0, 0.25), audioOnEntry = None, audioOnClick = None):
+    def __init__(self, padding = (1, 1, 1, 1), color = (1.0, 1.0, 1.0, 0.25), audioOnEntry = None, audioOnClick = None, bgElementFunc = None):
         self.padding = padding
         self.color = color
         self.audioOnEntry = audioOnEntry
         self.audioOnClick = audioOnClick
+        self.bgElementFunc = bgElementFunc
 
     def _GetHoverElement(self, _self):
         return getattr(_self, '_hoverEffect_bgFill', None)

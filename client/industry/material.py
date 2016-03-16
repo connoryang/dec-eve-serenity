@@ -1,5 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\industry\material.py
 import fsdlite
+import signals
 import industry
 
 class Material(industry.Base):
@@ -23,9 +24,9 @@ class Material(industry.Base):
         obj._options = []
         obj._modifiers = []
         obj._probability = 1
-        obj.on_updated = fsdlite.Signal()
-        obj.on_errors = fsdlite.Signal()
-        obj.on_select = fsdlite.Signal()
+        obj.on_updated = signals.Signal()
+        obj.on_errors = signals.Signal()
+        obj.on_select = signals.Signal()
         return obj
 
     def __init__(self, *args, **kwargs):

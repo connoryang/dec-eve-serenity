@@ -2,9 +2,11 @@
 from carbonui import const as uiconst
 from carbonui.primitives.sprite import Sprite
 from eve.client.script.environment.invControllers import ShipCargo
+from eve.client.script.ui.camera.cameraUtil import IsAutoTrackingEnabled
 from eve.client.script.ui.inflight.radialMenuCamera import RadialMenuCamera
 from eve.client.script.ui.inflight.radialMenuScanner import RadialMenuScanner
 import evecamera
+from localization import GetByLabel
 import uthread
 from eve.client.script.ui.shared.inventory.invWindow import Inventory
 from eve.common.script.sys.eveCfg import GetActiveShip
@@ -283,16 +285,50 @@ class LeftSideButtonCameraPOV(LeftSideButtonCameraBase):
         LeftSideButton.OnClick(self)
         uicore.cmd.CmdSetCameraPOV()
 
+    def LoadTooltipPanel(self, tooltipPanel, *args):
+        LeftSideButtonCameraBase.LoadTooltipPanel(self, tooltipPanel, *args)
+        tooltipPanel.AddSpacer(width=0, height=5)
+        for cmdName in ('CmdFlightControlsUp', 'CmdFlightControlsDown', 'CmdFlightControlsLeft', 'CmdFlightControlsRight'):
+            cmd = uicore.cmd.commandMap.GetCommandByName(cmdName)
+            tooltipPanel.AddCommandTooltip(cmd)
+            tooltipPanel.AddSpacer(width=0, height=1)
+
 
 class LeftSideButtonCameraOrbit(LeftSideButtonCameraBase):
     default_name = 'cameraButtonOrbit'
     default_texturePath = 'res:/UI/Texture/classes/ShipUI/iconCameraOrbit.png'
     cmdName = 'CmdSetCameraOrbit'
     cameraID = evecamera.CAM_SHIPORBIT
+    __notifyevents__ = LeftSideButtonCameraBase.__notifyevents__ + ['OnAutoTrackingChanged']
+
+    def ApplyAttributes(self, attributes):
+        LeftSideButtonCameraBase.ApplyAttributes(self, attributes)
+        self.UpdateIcon()
+
+    def UpdateIcon(self):
+        if IsAutoTrackingEnabled():
+            self.LoadIcon('res:/UI/Texture/classes/ShipUI/iconCameraTracking.png')
+        else:
+            self.LoadIcon('res:/UI/Texture/classes/ShipUI/iconCameraOrbit.png')
 
     def OnClick(self, *args):
         LeftSideButton.OnClick(self)
         uicore.cmd.CmdSetCameraOrbit()
+
+    def LoadTooltipPanel(self, tooltipPanel, *args):
+        LeftSideButtonCameraBase.LoadTooltipPanel(self, tooltipPanel, *args)
+        tooltipPanel.AddSpacer(width=0, height=5)
+        tooltipPanel.AddLabelShortcut(GetByLabel('Tooltips/Hud/FOVZoom'), GetByLabel('Tooltips/Hud/AltPlusZoom'))
+        cmd = uicore.cmd.commandMap.GetCommandByName('CmdToggleAutoTracking')
+        tooltipPanel.AddSpacer(width=0, height=1)
+        tooltipPanel.AddCommandTooltip(cmd)
+
+    def OnAutoTrackingChanged(self):
+        self.UpdateIcon()
+        self.Blink(3)
+
+    def GetMenu(self):
+        return [(GetByLabel('UI/Commands/CmdToggleAutoTracking'), uicore.cmd.CmdToggleAutoTracking)]
 
 
 class LeftSideButtonCameraTactical(LeftSideButtonCameraBase):
@@ -304,3 +340,8 @@ class LeftSideButtonCameraTactical(LeftSideButtonCameraBase):
     def OnClick(self, *args):
         LeftSideButton.OnClick(self)
         uicore.cmd.CmdSetCameraTactical()
+
+    def LoadTooltipPanel(self, tooltipPanel, *args):
+        LeftSideButtonCameraBase.LoadTooltipPanel(self, tooltipPanel, *args)
+        tooltipPanel.AddSpacer(width=0, height=5)
+        tooltipPanel.AddLabelShortcut(GetByLabel('Tooltips/Hud/Pan'), GetByLabel('Tooltips/Hud/RightMouse'))

@@ -1,10 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\camera\tacticalCamera.py
-import blue
 import geo2
 import math
-import destiny
+from eve.client.script.parklife import states
 from eve.client.script.ui.camera.baseSpaceCamera import BaseSpaceCamera
-from eve.client.script.ui.camera.cameraUtil import GetDurationByDistance
+from eve.client.script.ui.camera.cameraUtil import GetDurationByDistance, GetBallPosition, GetBall, GetBallMaxZoom, IsBallWarping, CheckShowModelTurrets
 import evecamera
 DEFAULT_EYEDIST = 40000
 FREE_ORBIT_DIST = 250
@@ -21,62 +20,82 @@ class TacticalCamera(BaseSpaceCamera):
 
     def __init__(self):
         BaseSpaceCamera.__init__(self)
-        self.lastLookAtTime = None
         self.lastLookAtID = None
         self.sceneCursor = (0, 0, 0)
+        self.ballPosition = BallPositionAnimator()
 
-    def SetFixedAtPosition(self):
-        vec = geo2.Vec3Direction(self.atPosition, self.eyePosition)
-        zoomVec = geo2.Vec3Scale(vec, FREE_ORBIT_DIST)
-        self.atPosition = geo2.Vec3Add(self.eyePosition, zoomVec)
-        self.lastLookAtID = None
+    def GetLookAtItemID(self):
+        if self.IsAttached():
+            return self.GetItemID()
+        else:
+            return None
 
-    def LookingAt(self):
-        return None
+    def IsAttached(self):
+        return self.ballPosition.IsAttached()
 
-    def GetCameraInterestID(self):
-        return None
-
-    def LookAt(self, itemID, allowSwitchCamera = True):
+    def LookAt(self, itemID, allowSwitchCamera = True, **kwargs):
         if not self.IsManualControlEnabled():
             return
-        ball = self.GetBall(itemID)
-        if not ball:
+        if itemID == self.GetItemID():
             return
-        ballPos = self.GetBallPosition(ball)
-        if self._eyeAndAtOffset:
-            ballPos = geo2.Vec3Subtract(ballPos, self._eyeAndAtOffset)
+        if itemID == self.ego:
+            sm.ScatterEvent('OnLookAtMyShip', itemID)
+        else:
+            sm.ScatterEvent('OnLookAtOther', itemID)
+        self.StopUpdateThreads()
+        ball = GetBall(itemID)
+        if ball:
+            CheckShowModelTurrets(ball)
+        ballPos = GetBallPosition(ball)
         if self.CheckObjectTooFar(itemID):
             self.LookAtFar(ballPos)
             return
-        if itemID == self.lastLookAtID and self.lastLookAtTime and allowSwitchCamera:
-            if blue.os.GetWallclockTime() - self.lastLookAtTime < 5 * SEC:
-                sm.GetService('sceneManager').SetActiveCameraByID(evecamera.CAM_SHIPORBIT, itemID=itemID)
-                return
-        self.lastLookAtID = itemID
-        self.lastLookAtTime = blue.os.GetWallclockTime()
-        lookDir = self.GetLookAtDirectionWithOffset()
-        atPos1 = ballPos
-        currDist = geo2.Vec3Distance(self.eyePosition, ballPos)
-        eyePos1 = geo2.Vec3Add(ballPos, geo2.Vec3Scale(lookDir, min(currDist, LOOKAT_DIST)))
-        self.StopEyeAndAtAnimation()
-        duration = GetDurationByDistance(self.eyePosition, eyePos1, minTime=0.4)
-        uicore.animations.MorphVector3(self, 'atPosition', self._atPosition, atPos1, duration=duration)
-        uicore.animations.MorphVector3(self, 'eyePosition', self._eyePosition, eyePos1, duration=duration)
+        eyePos1 = geo2.Vec3Subtract(self._eyePosition, self._atPosition)
+        maxZoom = self.maxZoom
+        if geo2.Vec3Length(eyePos1) < self.maxZoom:
+            eyePos1 = geo2.Vec3Scale(geo2.Vec3Normalize(eyePos1), self.maxZoom)
+        duration = GetDurationByDistance(self.ballPosition.GetPosition(), ballPos, minTime=0.3)
+        uicore.animations.MorphVector3(self, '_atPosition', self._atPosition, (0, 0, 0), duration=duration)
+        uicore.animations.MorphVector3(self, '_eyePosition', self._eyePosition, eyePos1, duration=duration)
+        self._SetLookAtBall(ball, duration=duration)
+
+    def _SetLookAtBall(self, ball, animate = True, duration = 0.6):
+        self.ballPosition.SetBall(ball, animate=animate, duration=duration)
+        if ball:
+            self.UpdateMaxZoom(ball)
+            self.lastLookAtID = ball.id
+            sm.StartService('state').SetState(ball.id, states.lookingAt, True)
+
+    def OnDeactivated(self):
+        BaseSpaceCamera.OnDeactivated(self)
+        self._eyePosition = geo2.Vec3Subtract(self._eyePosition, self._atPosition)
+        self._atPosition = (0, 0, 0)
+        self._SetLookAtBall(None)
+
+    def UpdateMaxZoom(self, ball):
+        self.SetMaxZoom(GetBallMaxZoom(ball, self.nearClip))
 
     def LookAtFar(self, ballPos):
+        self.Detach()
         ballDir = geo2.Vec3Normalize(ballPos)
+        ballDir = geo2.Vec3Direction(ballPos, self.eyePosition)
         atPosition = geo2.Vec3Add(self._eyePosition, geo2.Vec3Scale(ballDir, self.GetZoomDistance()))
         self.Transit(self._atPosition, self._eyePosition, atPosition, self._eyePosition, duration=1.0)
 
     def Pan(self, dx = None, dy = None, dz = None):
         if not self.IsManualControlEnabled():
             return
+        if self.IsActiveOrTrackingShipWarping():
+            return
+        self.Detach()
+        k = 0.5 + 5 * self.GetDistanceToSceneCursor()
+        BaseSpaceCamera.Pan(self, k * dx, k * dy, k * dz)
+
+    def Detach(self):
+        self.ballPosition.SetAbstractBall()
         if self.lastLookAtID:
             self.lastLookAtID = None
             self.sceneCursor = self.atPosition
-        k = 0.5 + 5 * self.GetDistanceToSceneCursor()
-        BaseSpaceCamera.Pan(self, k * dx, k * dy, k * dz)
 
     def GetDistanceToSceneCursor(self):
         anchorDist = geo2.Vec3Distance(self.eyePosition, self.sceneCursor)
@@ -84,23 +103,21 @@ class TacticalCamera(BaseSpaceCamera):
         zoomProp = max(0.0, min(math.fabs(zoomProp), 2.0))
         return zoomProp
 
-    def ResetCamera(self):
+    def ResetCamera(self, *args):
         self.LookAt(self.ego)
 
-    def OnDeactivated(self):
-        BaseSpaceCamera.OnDeactivated(self)
-        self.ResetAnchorPos()
-
     def OnActivated(self, lastCamera = None, itemID = None, **kwargs):
-        if lastCamera and lastCamera.cameraID == evecamera.CAM_SHIPORBIT:
+        settings.char.ui.Set('spaceCameraID', evecamera.CAM_TACTICAL)
+        if lastCamera and lastCamera.cameraID in (evecamera.CAM_SHIPORBIT, evecamera.CAM_JUMP):
             eyePos0 = lastCamera.eyePosition
             atPos0 = lastCamera.atPosition
-            self._ResetEyePosition(atPos0, eyePos0, atPos0)
+            self._ResetEyePosition(eyePos0, atPos0)
             self.fov = lastCamera.fov
             self.SetFovTarget(self.default_fov)
-            self.lastLookAtID = lastCamera.GetItemID()
+            self._SetLookAtBall(GetBall(lastCamera.GetItemID()), animate=False)
+        elif itemID:
+            self._SetLookAtBall(GetBall(itemID))
         BaseSpaceCamera.OnActivated(self, **kwargs)
-        self.UpdateAnchorPos()
 
     def _GetNewDirection(self, direction):
         y = geo2.Vec2Length((direction[0], direction[2]))
@@ -108,25 +125,29 @@ class TacticalCamera(BaseSpaceCamera):
         direction = geo2.Vec3Normalize(direction)
         return direction
 
-    def _ResetEyePosition(self, atPos0, eyePos0, atPos1):
+    def _ResetEyePosition(self, eyePos0, atPos0):
         direction = self._GetNewDirection(geo2.Vec3Subtract(eyePos0, atPos0))
-        eyePos1 = geo2.Vec3Add(atPos1, geo2.Vec3Scale(direction, LOOKAT_DIST))
+        eyePos0 = geo2.Vec3Subtract(eyePos0, atPos0)
+        eyePos1 = geo2.Vec3Scale(direction, LOOKAT_DIST)
         duration = GetDurationByDistance(eyePos0, eyePos1, 0.4, 0.6)
-        self.Transit(atPos0, eyePos0, atPos1, eyePos1, duration=duration)
+        self._eyePosition = eyePos0
+        self._atPosition = (0, 0, 0)
+        self.Transit(self._atPosition, eyePos0, (0, 0, 0), eyePos1, duration=duration, callback=self.EnableManualControl)
 
     def Update(self):
-        self.CheckWarping()
         BaseSpaceCamera.Update(self)
+        if self.IsActiveOrTrackingShipWarping():
+            self.LookAt(self.ego)
         self._EnforceMaximumDistance()
+        if self.ballPosition.GetItemID():
+            pos = self.ballPosition.GetPosition()
+            self._AddToEyeAndAtOffset(pos)
 
-    def CheckWarping(self):
-        ball = self.GetBall(session.shipid)
-        if ball is None:
-            return
-        if ball.mode == destiny.DSTBALL_WARP:
-            self.ResetAnchorPos()
-        elif not self._anchorBall:
-            self.UpdateAnchorPos()
+    def IsActiveOrTrackingShipWarping(self):
+        return IsBallWarping(self.GetItemID()) or IsBallWarping(self.ego)
+
+    def GetItemID(self):
+        return self.ballPosition.GetItemID()
 
     def _EnforceMaximumDistance(self):
         maxDist = evecamera.LOOKATRANGE_MAX_NEW
@@ -136,4 +157,66 @@ class TacticalCamera(BaseSpaceCamera):
             diff = geo2.Vec3Subtract(self.eyePosition, newEye)
             self._eyePosition = newEye
             self._atPosition = geo2.Vec3Subtract(self._atPosition, diff)
-            self.UpdateAnchorPos()
+
+    def OnCurrentShipWarping(self):
+        self.LookAt(self.ego)
+
+    def Track(self, itemID = None):
+        ball = GetBall(itemID)
+        if not ball:
+            return
+        self.LookAtFar(GetBallPosition(ball))
+
+
+class BallPositionAnimator(object):
+
+    def __init__(self):
+        self.ball = None
+        self.oldPos = None
+        self.offset = None
+        self._isAttached = False
+
+    def GetPosition(self):
+        if not self.ball:
+            return (0, 0, 0)
+        pos = GetBallPosition(self.ball)
+        if self.offset:
+            pos = geo2.Vec3Add(pos, self.offset)
+        return pos
+
+    def SetBall(self, ball, animate = True, duration = 0.6):
+        self._isAttached = True
+        self._SetBall(ball, animate, duration)
+
+    def _SetBall(self, ball, animate, duration):
+        if ball and self.ball:
+            oldPos = GetBallPosition(self.ball)
+            if animate:
+                self.offset = geo2.Vec3Subtract(oldPos, GetBallPosition(ball))
+                uicore.animations.MorphVector3(self, 'offset', self.offset, (0, 0, 0), duration=duration, callback=self._ResetOffset)
+            else:
+                self.offset = None
+        self.ball = ball
+
+    def SetAbstractBall(self, animate = True, duration = 0.6):
+        if not self._isAttached:
+            return
+        bp = sm.GetService('michelle').GetBallpark()
+        if not bp:
+            return
+        self._isAttached = False
+        pos = bp.GetCurrentEgoPos()
+        if self.ball:
+            pos = geo2.Vec3AddD(pos, GetBallPosition(self.ball))
+        ball = bp.AddClientSideBall(pos)
+        self._SetBall(ball, animate, duration)
+
+    def IsAttached(self):
+        return self._isAttached
+
+    def _ResetOffset(self):
+        self.offset = None
+
+    def GetItemID(self):
+        if self.ball:
+            return self.ball.id

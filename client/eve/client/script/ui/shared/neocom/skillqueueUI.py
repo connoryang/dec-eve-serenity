@@ -7,19 +7,21 @@ from carbonui.control.dragResizeCont import DragResizeCont
 from carbonui.control.scrollentries import SE_BaseClassCore
 from carbonui.primitives.base import ReverseScaleDpi
 from carbonui.primitives.container import Container
+from carbonui.primitives.containerAutoSize import ContainerAutoSize
 from carbonui.primitives.fill import Fill
 from carbonui.primitives.line import Line
 from carbonui.primitives.sprite import Sprite
 from carbonui.primitives.vectorlinetrace import VectorLineTrace
+from carbonui.util.color import Color
 from carbonui.util.stringManip import IntToRoman
 from carbonui.util.various_unsorted import GetClipboardData
-from characterskills.util import DISPLAY_SKILLQUEUE_LENGTH, GetSkillQueueTimeLength, HasShortSkillqueue, IsTrialRestricted, GetSPForLevelRaw
+import characterskills as charskills
 from eve.client.script.ui.control import entries as listentry
-from eve.client.script.ui.control.buttons import Button
+from eve.client.script.ui.control.buttons import Button, ButtonIcon
 from eve.client.script.ui.control.checkbox import Checkbox
 from eve.client.script.ui.control.eveCombo import Combo
 from eve.client.script.ui.control.eveIcon import Icon
-from eve.client.script.ui.control.eveLabel import EveLabelSmall, EveHeaderSmall, EveLabelMedium
+from eve.client.script.ui.control.eveLabel import EveLabelSmall, EveLabelMedium
 from eve.client.script.ui.control.eveScroll import Scroll
 from eve.client.script.ui.control.eveWindow import Window
 from eve.client.script.ui.quickFilter import QuickFilterEdit
@@ -34,11 +36,9 @@ import math
 import sys
 import telemetry
 from textImporting.importSkillplan import SkillPlanImportingStatus
-import uix
 import uthread
 import util
 import uiutil
-TIMELINE_BASEHEIGHT = 16
 FILTER_ALL = 0
 FILTER_PARTIAL = 1
 FILTER_EXCLUDELVL5 = 2
@@ -61,13 +61,16 @@ class SkillQueue(Window):
     __notifyevents__ = ['OnSkillsChanged',
      'OnSkillQueueChanged',
      'OnUIRefresh',
-     'OnSkillQueueRefreshed']
+     'OnSkillQueueRefreshed',
+     'OnFreeSkillPointsChanged_Local']
     default_windowID = 'trainingqueue'
     default_captionLabelPath = 'UI/SkillQueue/TrainingQueue'
     default_descriptionLabelPath = 'Tooltips/Neocom/SkillTrainingQueue_description'
     default_iconNum = 'res:/ui/Texture/WindowIcons/trainingqueue.png'
     COLOR_SKILL_1 = (0.21, 0.62, 0.74, 1.0)
     COLOR_SKILL_2 = (0.0, 0.52, 0.67, 1.0)
+    COLOR_UNALLOCATED_1 = (1.0, 0.8, 0.0, 1.0)
+    COLOR_UNALLOCATED_2 = (0.9, 0.7, 0.0, 1.0)
 
     def ApplyAttributes(self, attributes):
         Window.ApplyAttributes(self, attributes)
@@ -78,16 +81,16 @@ class SkillQueue(Window):
         self.SetTopparentHeight(0)
         self.queueLastApplied = []
         self.isSaving = 0
-        self.maxSkillqueueLength = GetSkillQueueTimeLength(session.userType)
+        self.isApplying = False
+        self.maxSkillqueueLength = charskills.GetSkillQueueTimeLength(session.userType)
         self.minWidth = 360
         self.SetMinSize([self.minWidth, 350])
         self.expanded = 0
-        self.skillTimer = 0
-        self.barTimer = 0
+        self.skillTimer = None
+        self.timelineCont = None
         self.skillQueueSvc = sm.GetService('skillqueue')
         self.ConstructLayout()
         self.Load()
-        uthread.new(self._OnResize)
         self.SetHeaderIcon()
         headerIcon = self.sr.headerIcon
         headerIcon.GetMenu = self.GetSkillQueueWindowMenu
@@ -116,8 +119,8 @@ class SkillQueue(Window):
         inTraining = self.skillQueueSvc.SkillInTraining()
         if not inTraining:
             self.GrayButton(self.sr.pauseBtn, gray=1)
-        uthread.new(self.StartBars)
         uthread.new(self.LoopTimers)
+        self.UpdateFreeSkillPoints()
         if self.overlay.ShouldDisplay():
             self.DisplayMultiTrainingOverlay()
 
@@ -128,7 +131,7 @@ class SkillQueue(Window):
     @telemetry.ZONE_METHOD
     def ConstructLayout(self):
         self.overlay = MultiTrainingOverlay(parent=self.GetMainArea(), padding=(-2, 0, -2, 2))
-        self.sr.leftOuterPar = DragResizeCont(name='leftOuterPar', parent=self.sr.main, align=uiconst.TOLEFT_PROP, settingsID='skillQueue', minSize=0.35, maxSize=0.7)
+        self.sr.leftOuterPar = DragResizeCont(name='leftOuterPar', parent=self.sr.main, align=uiconst.TOLEFT_PROP, settingsID='skillQueue', minSize=0.4, maxSize=0.6)
         self.sr.main.padLeft = self.sr.main.padRight = const.defaultPadding
         self.sr.rightOuterPar = Container(name='rightOuterPar', parent=self.sr.main, align=uiconst.TOALL, pos=(0, 0, 0, 0))
         self.sr.leftFooterPar = Container(parent=self.sr.leftOuterPar, align=uiconst.TOBOTTOM, height=26)
@@ -138,21 +141,19 @@ class SkillQueue(Window):
         self.sr.leftScroll.SelectAll = self.DoNothing
         self.sr.leftScroll.sr.content.OnDropData = self.DoRemove
         self.sr.leftScroll.sr.content.AddSkillToQueue = self.AddSkillToQueue
+        self.sr.unallocatedCont = ContainerAutoSize(parent=self.sr.rightOuterPar, align=uiconst.TOTOP, alignMode=uiconst.TOTOP, state=uiconst.UI_HIDDEN, top=8)
+        buttonCont = ContainerAutoSize(parent=self.sr.unallocatedCont, align=uiconst.TORIGHT, padding=(4, 4, 4, 4))
+        Button(parent=buttonCont, align=uiconst.CENTER, label=localization.GetByLabel('UI/SkillQueue/ApplySkillPoints'), func=self.ApplySkillPoints)
+        self.sr.unallocatedText = EveLabelMedium(parent=self.sr.unallocatedCont, align=uiconst.TOTOP, padding=(0, 6, 0, 6))
+        mainBarCont = Container(name='mainBarCont', parent=self.sr.rightOuterPar, align=uiconst.TOTOP, top=8, height=40, padLeft=1, padRight=1)
+        self.sr.barCont = Container(name='barCont', parent=mainBarCont, align=uiconst.TOTOP, height=19)
+        self.sr.mainBar = Container(name='mainBar', parent=self.sr.barCont, align=uiconst.TOALL, pos=(0, 0, 0, 0), clipChildren=1)
+        Fill(parent=self.sr.mainBar, align=uiconst.TOTOP, color=(0.2, 0.2, 0.2, 1), height=19, state=uiconst.UI_DISABLED)
+        self.sr.timelineTickCont = Container(parent=mainBarCont, align=uiconst.TOTOP, height=20, clipChildren=True)
         self.sr.rightHeader = Container(parent=self.sr.rightOuterPar, align=uiconst.TOTOP, height=20, padBottom=2, clipChildren=1)
         self.sr.rightHeader._OnSizeChange_NoBlock = self.OnRightHeaderSizeChanged
-        self.sr.sqFinishesText = EveLabelSmall(parent=self.sr.rightHeader, left=4, state=uiconst.UI_DISABLED, align=uiconst.BOTTOMLEFT)
-        self.sr.sqTimeText = EveLabelSmall(parent=self.sr.rightHeader, left=4, state=uiconst.UI_DISABLED, align=uiconst.BOTTOMRIGHT)
-        mainBarCont = Container(name='mainBarCont', parent=self.sr.rightOuterPar, align=uiconst.TOTOP, height=19, padLeft=const.defaultPadding, padRight=const.defaultPadding)
-        self.sr.barCont = Container(name='barCont', parent=mainBarCont, align=uiconst.TOTOP, height=19)
-        self.sr.arrowCont = Container(name='arrowCont', parent=self.sr.barCont, align=uiconst.TORIGHT, width=5, state=uiconst.UI_HIDDEN, idx=0)
-        self.sr.mainBar = Container(name='mainBar', parent=self.sr.barCont, align=uiconst.TOALL, pos=(0, 0, 0, 0), clipChildren=1)
-        self.sr.timeLine = Container(name='timeLine', parent=self.sr.rightOuterPar, align=uiconst.TOTOP, height=TIMELINE_BASEHEIGHT, padLeft=const.defaultPadding, padRight=const.defaultPadding, clipChildren=True)
-        sprite = Sprite(name='arrow', parent=self.sr.arrowCont, align=uiconst.TOALL, state=uiconst.UI_DISABLED, texturePath='res:/UI/Texture/Shared/whiteArrow.png')
-        sprite.rectTop = 0
-        sprite.rectLeft = 0
-        sprite.rectWidth = 9
-        sprite.rectHeight = 19
-        self.sr.arrowSprite = sprite
+        self.sr.sqFinishesText = EveLabelSmall(parent=self.sr.rightHeader, state=uiconst.UI_DISABLED, align=uiconst.BOTTOMLEFT)
+        self.sr.sqTimeText = EveLabelSmall(parent=self.sr.rightHeader, state=uiconst.UI_DISABLED, align=uiconst.BOTTOMRIGHT)
         self.sr.rightScroll = Scroll(parent=self.sr.rightOuterPar, padTop=const.defaultPadding, padBottom=const.defaultPadding)
         self.sr.rightScroll.sr.content.OnDropData = self.DoDropData
         self.sr.rightScroll.sr.content.OnDragEnter = self.OnContentDragEnter
@@ -160,7 +161,7 @@ class SkillQueue(Window):
         self.sr.rightScroll.sr.content.RemoveSkillFromQueue = self.RemoveSkillFromQueue
         comboOptions = [(localization.GetByLabel('UI/SkillQueue/MySkills'), FILTER_ALL), (localization.GetByLabel('UI/SkillQueue/MyPartiallyTrainedSkills'), FILTER_PARTIAL), (localization.GetByLabel('UI/SkillQueue/ExcludeFullyTrainedSkills'), FILTER_EXCLUDELVL5)]
         self.sr.skillCombo = Combo(label='', parent=self.sr.leftHeader, options=comboOptions, name='', align=uiconst.TOPLEFT, pos=(2, 22, 0, 0), callback=self.OnComboChange, width=200)
-        if HasShortSkillqueue(session.userType):
+        if charskills.HasShortSkillqueue(session.userType):
             self.sr.leftHeader.height = 82
             fitsChecked = settings.user.ui.Get('skillqueue_fitsinqueue', FITSINQUEUE_DEFAULT)
             cb = Checkbox(text=localization.GetByLabel('UI/SkillQueue/FitInQueueTimeframe'), parent=self.sr.leftHeader, configName='skillqueue_fitsinqueue', retval=None, checked=fitsChecked, callback=self.OnCheckboxChange, align=uiconst.TOPLEFT, pos=(0,
@@ -179,7 +180,7 @@ class SkillQueue(Window):
         applyBtn = Button(parent=self.sr.rightFooterPar, name='trainingQueueApplyBtn', label=localization.GetByLabel('UI/Commands/Apply'), pos=(const.defaultPadding,
          3,
          0,
-         0), func=self.SaveChanges)
+         0), func=self.SaveChanges, args=(True,))
         self.sr.pauseBtn = Button(parent=self.sr.rightFooterPar, name='trainingQueuePauseBtn', label=localization.GetByLabel('UI/Commands/Pause'), pos=(applyBtn.left + applyBtn.width + 2,
          3,
          0,
@@ -213,7 +214,6 @@ class SkillQueue(Window):
 
     def OnClickLeftExpander(self, *args):
         self.SetupCollapsed()
-        self._OnResize()
 
     def SetupCollapsed(self):
         self.SetMinSize([self.minWidth, 350])
@@ -225,7 +225,6 @@ class SkillQueue(Window):
     def OnClickRightExpander(self, *args):
         self.SetupExpanded()
         self.LoadSkills()
-        self._OnResize()
 
     def SetupExpanded(self):
         self.SetMinSize([700, 350])
@@ -234,13 +233,13 @@ class SkillQueue(Window):
         self.sr.leftOuterPar.state = uiconst.UI_PICKCHILDREN
         self.sr.rightExpander.state = uiconst.UI_HIDDEN
 
-    def SaveChanges(self, *args):
+    def SaveChanges(self, activate = True):
         if self.isSaving == 1:
             return
         queue = self.skillQueueSvc.GetQueue()
         try:
             self.isSaving = 1
-            self.skillQueueSvc.CommitTransaction()
+            self.skillQueueSvc.CommitTransaction(activate=activate)
             self.queueLastApplied = queue
         finally:
             if self and not self.destroyed:
@@ -261,8 +260,6 @@ class SkillQueue(Window):
             uthread.new(self.ConfirmSavingOnClose)
         else:
             self.skillQueueSvc.RollbackTransaction()
-        self.barTimer = None
-        self.barUpdatingTimer = None
 
     def ConfirmSavingOnClose(self):
         if eve.Message('QueueSaveChangesOnClose', {}, uiconst.YESNO, suppress=uiconst.ID_YES) == uiconst.ID_YES:
@@ -271,20 +268,20 @@ class SkillQueue(Window):
         else:
             self.skillQueueSvc.RollbackTransaction()
 
-    def ReloadSkills(self, force = 0, time = 1000):
+    def ReloadSkills(self, force = 0, time = 250):
         if self.expanded == 1 or force:
             self.skillTimer = base.AutoTimer(time, self.LoadSkills)
 
     @telemetry.ZONE_METHOD
     def LoadSkills(self):
-        self.skillTimer = 0
+        self.skillTimer = None
         groups = self.skills.GetSkillGroups()
         scrolllist = []
         queueLength = self.skillQueueSvc.GetTrainingLengthOfQueue()
         timeLeftInQueue = max(0, self.maxSkillqueueLength - queueLength)
         queue = self.skillQueueSvc.GetQueue()
         skillsInQueue = [ skill.trainingTypeID for skill in queue ]
-        fitsChecked = HasShortSkillqueue(session.userType) and settings.user.ui.Get('skillqueue_fitsinqueue', FITSINQUEUE_DEFAULT)
+        fitsChecked = charskills.HasShortSkillqueue(session.userType) and settings.user.ui.Get('skillqueue_fitsinqueue', FITSINQUEUE_DEFAULT)
         partialChecked = settings.user.ui.Get('skillqueue_comboFilter', FILTER_ALL) == FILTER_PARTIAL
         excludeLvl5 = settings.user.ui.Get('skillqueue_comboFilter', FILTER_ALL) == FILTER_EXCLUDELVL5
         for group, skills, untrained, intraining, inqueue, points in groups:
@@ -419,12 +416,13 @@ class SkillQueue(Window):
         data['skillID'] = typeID
         data['inTraining'] = [0, 1][inTraining]
         data['isAccelerated'] = isAccelerated
-        entry = listentry.Get('SkillQueueSkillEntry', data)
+        data['RemoveFromQueue'] = lambda x: self.DoRemove(None, [x])
+        entry = listentry.Get(decoClass=QueuedSkillEntry, data=data)
         return entry
 
     def UpdateTime(self):
         self.SetTime()
-        self.DrawBars()
+        self.DrawTimeline()
 
     @telemetry.ZONE_METHOD
     def SetTime(self):
@@ -497,127 +495,123 @@ class SkillQueue(Window):
                 timeLeft = max(0, timeLeft)
                 timeLeftText = localization.formatters.FormatTimeIntervalShortWritten(long(timeLeft), showFrom='day', showTo='second')
                 self.sr.sqTimeText.text = timeLeftText
-                self.UpdatingBars()
+                self.DrawTimeline()
             else:
                 self.sr.sqFinishesText.text = ''
                 self.sr.sqTimeText.text = ''
             self.UpdateSQTimeTextSizes()
             blue.pyos.synchro.SleepWallclock(1000)
 
-    def StartBars(self):
-        while self and not self.destroyed:
-            if util.GetAttrs(self, 'sr', 'mainBar') and self.sr.mainBar.absoluteRight - self.sr.mainBar.absoluteLeft > 0:
-                break
-            blue.pyos.synchro.SleepWallclock(500)
-
-        if not self or self.destroyed:
-            return
+    def DrawTimeline(self):
         self.DrawBars()
-
-    def UpdatingBars(self):
-        self.barUpdatingTimer = base.AutoTimer(1000, self.DrawBars, (1,))
-
-    def RedrawBars(self):
-        self.barTimer = base.AutoTimer(1000, self.DrawBars)
+        self.DrawTimelineTicks()
 
     @telemetry.ZONE_METHOD
-    def DrawBars(self, updating = 0):
-        bar = self.sr.mainBar
-        if bar is None or bar.destroyed:
-            return
-        l, t, w, h = bar.GetAbsolute()
-        if w <= 0:
-            return
-        inTraining = self.skillQueueSvc.SkillInTraining()
-        if updating and inTraining is None:
-            return
-        self.barTimer = 0
-        self.barUpdatingTimer = 0
-        barWidth = w
-        if getattr(self, 'timelineCont', None) and not self.timelineCont.destroyed:
-            self.timelineCont.FlushLine()
-        else:
-            self.timelineCont = TimelineContainer(parent=self.sr.mainBar, barHeight=19)
-        uix.Flush(self.sr.timeLine)
-        percentages = {}
-        for item in self.allTrainingLengths.iteritems():
-            key, value = item
-            time = value[1]
-            if inTraining and key[0] == inTraining.typeID and key[1] == inTraining.skillLevel + 1:
-                ETA = self.skillQueueSvc.GetEndOfTraining(inTraining.typeID)
-                if ETA is not None:
-                    time = float(ETA - blue.os.GetWallclockTime())
-            per = time / DISPLAY_SKILLQUEUE_LENGTH
-            percentages[key] = per
-
-        hours = DISPLAY_SKILLQUEUE_LENGTH / const.HOUR
-        interval = barWidth / float(hours)
-        left = 0
-        for i in xrange(hours + 1):
-            left = min(barWidth - 1, int(i * interval))
-            Line(parent=self.sr.timeLine, align=uiconst.RELATIVE, weight=1, left=left, width=1, height=5)
-
-        txt0 = EveHeaderSmall(text='0', parent=self.sr.timeLine, top=5, left=0, state=uiconst.UI_NORMAL)
-        txt12 = EveHeaderSmall(text='12', parent=self.sr.timeLine, top=5, left=int(interval * 12) - 5, state=uiconst.UI_NORMAL)
-        txt24 = EveHeaderSmall(text='24', parent=self.sr.timeLine, top=5, state=uiconst.UI_NORMAL, align=uiconst.TOPRIGHT)
-        self.sr.timeLine.height = max(TIMELINE_BASEHEIGHT, txt24.height + 5)
-        colors = [self.COLOR_SKILL_1, self.COLOR_SKILL_2]
+    def DrawBars(self):
+        NORMAL_COLORS = [self.COLOR_SKILL_1, self.COLOR_SKILL_2]
+        UNALLOCATED_COLORS = [self.COLOR_UNALLOCATED_1, self.COLOR_UNALLOCATED_2]
+        self._CheckConstructTimeline()
+        self.timelineCont.FlushLine()
+        offset = 0.0
         queue = self.skillQueueSvc.GetQueue()
-        left = 0
-        counter = 0
-        barInfo = []
-        color = 1
-        f = None
-        for trainingSkill in queue:
-            key = (trainingSkill.trainingTypeID, trainingSkill.trainingToLevel)
-            color = int(not color)
-            realColor = colors[color]
-            percentage = percentages.get(key, 0.0)
-            width = max(2, percentage * barWidth)
-            newLeft = left + width
-            self.timelineCont.AddPoint(left, color=(realColor[0],
-             realColor[1],
-             realColor[2],
-             1.0))
-            self.timelineCont.AddPoint(newLeft, color=(realColor[0],
-             realColor[1],
-             realColor[2],
-             1.0))
-            barInfo.append((width, left, colors[color]))
-            left = newLeft
-            counter += 1
+        entries = self.sr.rightScroll.GetNodes()
+        unallocatedPoints = sm.GetService('skills').GetFreeSkillPoints()
+        timelineDuration = max(self.queueTimeLeft, const.DAY)
+        for i, (skill, entry) in enumerate(zip(queue, entries)):
+            timeLeft = self.allTrainingLengths[skill.trainingTypeID, skill.trainingToLevel][1]
+            inTraining = self.skillQueueSvc.SkillInTraining()
+            if inTraining and skill.trainingTypeID == inTraining.typeID and skill.trainingToLevel - 1 == inTraining.skillLevel:
+                actualEnd = self.skillQueueSvc.GetEndOfTraining(inTraining.typeID)
+                if actualEnd is not None:
+                    timeLeft = float(actualEnd - blue.os.GetWallclockTime())
+            width = timeLeft / timelineDuration
+            segments = []
+            if unallocatedPoints > 0:
+                pointsTrained = skill.trainingDestinationSP - skill.trainingStartSP
+                if unallocatedPoints >= pointsTrained:
+                    segments.append((width, UNALLOCATED_COLORS[i % 2]))
+                else:
+                    fractionCovered = min(1.0, unallocatedPoints / float(pointsTrained))
+                    segments.append((width * fractionCovered, UNALLOCATED_COLORS[i % 2]))
+                    segments.append((width * (1.0 - fractionCovered), NORMAL_COLORS[i % 2]))
+                unallocatedPoints -= pointsTrained
+            else:
+                segments.append((width, NORMAL_COLORS[i % 2]))
+            try:
+                if entry.panel is not None:
+                    entry.panel.DrawTimeline(offset, segments)
+            except AttributeError:
+                pass
 
-        Fill(parent=bar, align=uiconst.TOTOP, color=(0.2, 0.2, 0.2, 1), height=19, state=uiconst.UI_DISABLED)
-        if barWidth and left > barWidth:
-            self.sr.arrowCont.state = uiconst.UI_DISABLED
-            self.sr.arrowSprite.color.SetRGB(colors[color][0], colors[color][1], colors[color][2])
-            if f is not None:
-                f.align = uiconst.TOALL
-                f.width = 0
+            for w, c in segments:
+                self.timelineCont.AddSegment(w, c)
+
+            offset += width
+
+    def _CheckConstructTimeline(self):
+        if self.timelineCont is None:
+            self.timelineCont = TimelineContainer(parent=self.sr.mainBar, barHeight=19, idx=0)
+
+    def DrawTimelineTicks(self):
+        INTERVALS = [(const.HOUR,
+          6 * const.HOUR,
+          28,
+          localization.formatters.TIME_CATEGORY_HOUR),
+         (6 * const.HOUR,
+          const.DAY,
+          29,
+          localization.formatters.TIME_CATEGORY_DAY),
+         (const.DAY,
+          const.WEEK,
+          31,
+          localization.formatters.TIME_CATEGORY_DAY),
+         (const.WEEK,
+          const.MONTH28,
+          28,
+          localization.formatters.TIME_CATEGORY_MONTH),
+         (const.MONTH30,
+          6 * const.MONTH30,
+          25,
+          localization.formatters.TIME_CATEGORY_MONTH),
+         (const.MONTH30,
+          const.YEAR360,
+          999,
+          localization.formatters.TIME_CATEGORY_YEAR)]
+        for minorTick, majorTick, tickLimit, timeCategory in INTERVALS:
+            queueDuration = max(self.queueTimeLeft, const.DAY + const.HOUR)
+            tickCount = queueDuration / float(minorTick)
+            if tickCount > tickLimit:
+                continue
+            _, _, barWidth, _ = self.sr.mainBar.GetAbsolute()
+            tickSpacing = barWidth / tickCount
+            self.sr.timelineTickCont.Flush()
+            for i in xrange(1, int(tickCount) + 1):
+                isMajorTick = i * minorTick % majorTick == 0
+                height = 5 if isMajorTick else 3
+                opacity = 0.4 if isMajorTick else 0.2
+                Line(parent=self.sr.timelineTickCont, align=uiconst.RELATIVE, weight=1, left=i * tickSpacing, width=1, height=height, color=(1.0,
+                 1.0,
+                 1.0,
+                 opacity))
+                if isMajorTick:
+                    text = localization.formatters.FormatTimeIntervalShortWritten(i * minorTick, showFrom=timeCategory, showTo=timeCategory)
+                    width, _ = EveLabelSmall.MeasureTextSize(text)
+                    EveLabelSmall(parent=self.sr.timelineTickCont, align=uiconst.RELATIVE, left=i * tickSpacing - width / 2.0, top=7, text=text, opacity=0.6)
+
+            break
+
+    def OnFreeSkillPointsChanged_Local(self):
+        self.UpdateFreeSkillPoints()
+
+    def UpdateFreeSkillPoints(self):
+        unallocatedPoints = sm.GetService('skills').GetFreeSkillPoints()
+        if unallocatedPoints > 0:
+            color = Color.RGBtoHex(*self.COLOR_UNALLOCATED_1)
+            text = localization.GetByLabel('UI/SkillQueue/FreeSkillPointAmount', points=unallocatedPoints, color=color)
+            self.sr.unallocatedText.SetText(text)
+            self.sr.unallocatedCont.display = True
         else:
-            self.sr.arrowCont.state = uiconst.UI_HIDDEN
-        self.UpdateBars(barInfo)
-
-    def UpdateBars(self, barInfo):
-        if not barInfo:
-            return
-        barInfoLength = len(barInfo)
-        for counter, entry in enumerate(self.sr.rightScroll.GetNodes()):
-            if entry.__guid__ != 'listentry.SkillQueueSkillEntry':
-                continue
-            barInfoLength = len(barInfo)
-            if counter > barInfoLength - 1:
-                return
-            self.SetBarInfo(entry, barInfo[counter])
-            if entry.panel is None or counter >= barInfoLength:
-                continue
-            entry.panel.UpdateBar()
-
-    def SetBarInfo(self, entry, barInfo):
-        width, left, color = barInfo
-        entry.barWidth = width
-        entry.barLeft = left
-        entry.barColor = color
+            self.sr.unallocatedCont.display = False
 
     def AddSkillToQueue(self, *args):
         queue = self.skillQueueSvc.GetQueue()
@@ -632,8 +626,6 @@ class SkillQueue(Window):
             self.UpdateTime()
 
     def AddSkillThroughSkillEntry(self, data, queue, idx = -1, refresh = 0):
-        if not data.Get('meetRequirements', 0):
-            return False
         if not data.Get('trained', True):
             eve.Message('CustomNotify', {'notify': localization.GetByLabel('UI/SkillQueue/DoNotHaveSkill')})
             return False
@@ -679,7 +671,7 @@ class SkillQueue(Window):
                 idx = len(self.sr.rightScroll.GetNodes()) - 1
             self.sr.rightScroll.AddEntries(idx, [entry])
         except UserError as e:
-            if e.msg == 'QueueTooLong' and IsTrialRestricted(session.userType):
+            if e.msg == 'QueueTooLong' and charskills.IsTrialRestricted(session.userType):
                 sys.exc_clear()
                 uicore.cmd.OpenTrialUpsell(origin=ORIGIN_CHARACTERSHEET, reason='skillqueue', message=localization.GetByLabel('UI/TrialUpsell/SkillQueueBody'))
             else:
@@ -722,6 +714,7 @@ class SkillQueue(Window):
                 self.sr.rightScroll.AddEntries(skillPos - movingBelow, [data])
                 self.sr.rightScroll.SelectNode(data)
                 self.ChangeTimesOnEntriesInQueue()
+                self.UpdateQueuedSkillsRemoveButton()
 
     def RemoveSkillFromQueue(self, *args):
         selected = self.sr.rightScroll.GetSelected()
@@ -739,6 +732,8 @@ class SkillQueue(Window):
             if not util.GetAttrs(entry, 'inQueue'):
                 return
             trainToLevel = entry.Get('trainToLevel', -1)
+            if not self.skillQueueSvc.IsRemoveAllowed(entry.invtype, trainToLevel):
+                continue
             try:
                 self.skillQueueSvc.RemoveSkillFromQueue(entry.invtype, trainToLevel)
                 removeList.append(entry)
@@ -810,6 +805,13 @@ class SkillQueue(Window):
         self.UpdateTime()
         self.ReloadEntriesIfNeeded()
 
+    def UpdateQueuedSkillsRemoveButton(self):
+        for node in self.sr.rightScroll.GetNodes():
+            if node.__guid__ != 'listentry.SkillQueueSkillEntry':
+                continue
+            if node.panel:
+                node.panel.UpdateRemoveButton()
+
     def ChangeTimesOnEntriesInQueue(self):
         timesForSkillsInQueue = self.skillQueueSvc.GetAllTrainingLengths()
         for node in self.sr.rightScroll.GetNodes():
@@ -838,7 +840,7 @@ class SkillQueue(Window):
             entry.trainToLevel = nextLevel - 1
             if nextLevel and nextLevel <= 5:
                 if nextLevel > 1:
-                    previousLevelEndSP = GetSPForLevelRaw(skill.skillRank, nextLevel - 1)
+                    previousLevelEndSP = charskills.GetSPForLevelRaw(skill.skillRank, nextLevel - 1)
                     previousLevelEndSP = max(previousLevelEndSP, skill.skillPoints)
                     theoreticalSP = {skillTypeID: previousLevelEndSP}
                 else:
@@ -864,6 +866,7 @@ class SkillQueue(Window):
 
     def ReloadEntriesIfNeeded(self, force = 0):
         self.ChangeTimesOnEntriesInQueue()
+        self.UpdateQueuedSkillsRemoveButton()
         if self.expanded == 0 and not force:
             return
         self.ChangeTimesOnEntriesInSkillList()
@@ -885,7 +888,7 @@ class SkillQueue(Window):
         self.OnSkillQueueChanged()
 
     def OnUIRefresh(self, *args):
-        if getattr(self, 'timelineCont'):
+        if self.timelineCont is not None:
             self.timelineCont.Close()
 
     def DoNothing(self):
@@ -975,6 +978,18 @@ class SkillQueue(Window):
             customInfoText += '<br>'.join(failedLines)
         eve.Message('CustomInfo', {'info': customInfoText}, modal=False)
 
+    def ApplySkillPoints(self, *args):
+        if self.isApplying:
+            return
+        self.isApplying = True
+        try:
+            isTraining = self.skillQueueSvc.SkillInTraining() is not None
+            self.SaveChanges(activate=isTraining)
+            self.skillQueueSvc.ApplyFreeSkillPointsToQueue()
+            sm.GetService('audio').SendUIEvent('st_allocate_skillpoints_play')
+        finally:
+            self.isApplying = False
+
 
 class SkillQueueSkillEntry(BaseSkillEntry):
     __guid__ = 'listentry.SkillQueueSkillEntry'
@@ -985,9 +1000,6 @@ class SkillQueueSkillEntry(BaseSkillEntry):
         self.entryHeight = 0
         self.blinking = 0
         BaseSkillEntry.Startup(self, *args)
-        self.barWidth = 0
-        self.barHeigth = 0
-        self.barLeft = 0
         self.sr.bar = Container(name='posIndicator', parent=self, align=uiconst.TOBOTTOM, state=uiconst.UI_DISABLED, height=3, top=0, clipChildren=1)
         self.sr.posIndicatorCont = Container(name='posIndicator', parent=self, align=uiconst.TOTOP, state=uiconst.UI_DISABLED, height=2)
         self.sr.posIndicatorNo = Fill(parent=self.sr.posIndicatorCont, state=uiconst.UI_HIDDEN, color=(0.61, 0.05, 0.005, 1.0))
@@ -1020,11 +1032,14 @@ class SkillQueueSkillEntry(BaseSkillEntry):
             self.sr.levelHeader1.text = localization.GetByLabel('UI/SkillQueue/Skills/SkillLevelWordAndValue', skillLevel=data.skill.skillLevel)
             self.sr.pointsLabel.text = self.skillPointsText
         if data.trained:
-            shouldNotUpdate = self.inQueue == 1 and data.skill.skillLevel + 1 != self.sr.node.trainToLevel
-            if data.inTraining and not shouldNotUpdate:
+            queue = self.skillQueueSvc.GetQueue()
+            isTypeActive = len(queue) and data.skill.typeID == queue[0].trainingTypeID
+            isRecordCurrentlyTraining = isTypeActive and (data.Get('inQueue', 0) == 0 or data.Get('currentLevel', -1) + 1 == data.Get('trainToLevel'))
+            if isRecordCurrentlyTraining:
                 uthread.new(self.UpdateTraining, data.skill)
             else:
                 skill = data.skill
+                spsThisLevel = self.skills.SkillpointsCurrentLevel(skill.typeID)
                 spsNextLevel = self.skills.SkillpointsNextLevel(skill.typeID)
                 if spsNextLevel is not None:
                     timeLeft = data.timeLeft
@@ -1033,10 +1048,7 @@ class SkillQueueSkillEntry(BaseSkillEntry):
                     else:
                         timeLeftText = ''
                     self.sr.timeLeftText.text = timeLeftText
-                if shouldNotUpdate:
-                    self.GetIcon('chapter')
-                else:
-                    self.UpdateHalfTrained()
+                self.UpdateHalfTrained()
         self.AdjustTimerContWidth()
         self.sr.levelParent.width = self.sr.levels.width + const.defaultPadding
         self.FillBoxes(data.skill.skillLevel, data.trainToLevel)
@@ -1044,7 +1056,6 @@ class SkillQueueSkillEntry(BaseSkillEntry):
         self.sr.posIndicatorYes.state = uiconst.UI_HIDDEN
         if self.inQueue == 1:
             self.sr.inTrainingHilite.state = uiconst.UI_HIDDEN
-            self.UpdateBar()
         self.UpdateAcceleratedMarker()
 
     def UpdateAcceleratedMarker(self):
@@ -1110,6 +1121,8 @@ class SkillQueueSkillEntry(BaseSkillEntry):
         currentPoints = BaseSkillEntry.UpdateTraining(self, skill)
         level = skill.skillLevel
         fill = self.sr.Get('box_%s' % int(level))
+        if not fill:
+            return
         fill.state = uiconst.UI_DISABLED
         if self.blinking == 1:
             fill.SetRGB(*SkillQueue.COLOR_SKILL_1)
@@ -1172,21 +1185,40 @@ class SkillQueueSkillEntry(BaseSkillEntry):
         self.sr.posIndicatorNo.state = uiconst.UI_HIDDEN
         self.sr.posIndicatorYes.state = uiconst.UI_HIDDEN
 
-    def UpdateBar(self):
-        if getattr(self, 'timelineCont', None) and not self.timelineCont.destroyed:
-            self.timelineCont.FlushLine()
-        else:
-            self.timelineCont = TimelineContainer(parent=self.sr.bar, barHeight=6)
-        width = self.sr.node.Get('barWidth', 0)
-        left = self.sr.node.Get('barLeft', 0)
-        color = self.sr.node.Get('barColor', (0, 0, 0, 0))
-        self.timelineCont.AddPoint(x=left, color=color)
-        self.timelineCont.AddPoint(x=left + width, color=color)
-
     def GetDynamicHeight(node, width):
         name = localization.GetByLabel('UI/SkillQueue/Skills/SkillNameAndRankValue', skill=node.skill.typeID, rank=0)
         _, nameHeight = EveLabelMedium.MeasureTextSize(name, maxLines=1)
         return max(36, 2 * nameHeight + 2)
+
+
+class QueuedSkillEntry(SkillQueueSkillEntry):
+
+    def Startup(self, *args):
+        super(QueuedSkillEntry, self).Startup(*args)
+        self.timelineCont = None
+        self.sr.infoicon.Close()
+        self.removeButton = ButtonIcon(parent=self, align=uiconst.CENTERRIGHT, texturePath='res:/UI/Texture/Icons/105_32_12.png', left=-1, top=-1, width=24, height=24, iconSize=24, func=self.RemoveFromQueue)
+        self.UpdateRemoveButton()
+
+    def DrawTimeline(self, offset, segments):
+        self._CheckConstructTimeline()
+        self.timelineCont.FlushLine()
+        self.timelineCont.offset = offset
+        for width, color in segments:
+            self.timelineCont.AddSegment(width, color)
+
+    def _CheckConstructTimeline(self):
+        if self.timelineCont is None:
+            self.timelineCont = TimelineContainer(parent=self.sr.bar, barHeight=6)
+
+    def RemoveFromQueue(self):
+        self.sr.node.RemoveFromQueue(self.sr.node)
+
+    def UpdateRemoveButton(self):
+        data = self.sr.node
+        skillQueueSvc = sm.GetService('skillqueue')
+        isRemovable = skillQueueSvc.IsRemoveAllowed(data.invtype, data.trainToLevel)
+        self.removeButton.display = isRemovable
 
 
 class SkillQueueLastDropEntry(SE_BaseClassCore):
@@ -1233,12 +1265,32 @@ class TimelineContainer(Container):
 
     def ApplyAttributes(self, attributes):
         Container.ApplyAttributes(self, attributes)
+        self._offset = 0.0
         barHeight = attributes.barHeight
         self.line = VectorLineTrace(name='bg', parent=self, lineWidth=barHeight, align=uiconst.CENTERLEFT)
+
+    @property
+    def offset(self):
+        return self._offset
+
+    @offset.setter
+    def offset(self, offset):
+        self._offset = offset
 
     def AddPoint(self, x, color):
         if not self.destroyed:
             self.line.AddPoint((x, 0), color=color)
 
+    def AddSegment(self, fraction, color):
+        if self.destroyed:
+            return
+        _, _, timelineWidth, _ = self.GetAbsolute()
+        left = self.offset * timelineWidth
+        width = max(1, fraction * timelineWidth)
+        self.AddPoint(left, color)
+        self.AddPoint(left + width, color)
+        self.offset += width / float(timelineWidth)
+
     def FlushLine(self):
         self.line.Flush()
+        self.offset = 0

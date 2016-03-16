@@ -50,7 +50,8 @@ validCategories = (const.categoryStation,
  const.categoryCharge,
  const.categorySovereigntyStructure,
  const.categoryPlanetaryInteraction,
- const.categoryOrbital)
+ const.categoryOrbital,
+ const.categoryFighter)
 bombGroups = (const.groupBomb,
  const.groupBombECM,
  const.groupBombEnergy,

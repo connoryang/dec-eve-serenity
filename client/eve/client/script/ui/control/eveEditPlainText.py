@@ -46,16 +46,16 @@ class EditPlainText(uicontrols.EditPlainTextCore):
                 else:
                     link = 'showinfo:' + str(entry.rec.typeID) + '//' + str(entry.rec.itemID)
                 self.AddLink(entry.name, link)
-            elif entry.__guid__ in ('listentry.VirtualAgentMissionEntry',):
+            elif entry.__guid__ == 'listentry.VirtualAgentMissionEntry':
                 link = 'fleetmission:' + str(entry.agentID) + '//' + str(entry.charID)
                 self.AddLink(entry.label, link)
             elif entry.__guid__ in ('listentry.CertEntry', 'listentry.CertEntryBasic'):
                 link = 'CertEntry:%s//%s' % (entry.certID, entry.level)
                 self.AddLink(entry.label, link)
-            elif entry.__guid__.startswith('listentry.ContractEntry'):
+            elif entry.__guid__ and entry.__guid__.startswith('listentry.ContractEntry'):
                 link = 'contract:' + str(entry.solarSystemID) + '//' + str(entry.contractID)
                 self.AddLink(entry.name.replace('&gt;', '>'), link)
-            elif entry.__guid__ in ('listentry.FleetFinderEntry',):
+            elif entry.__guid__ == 'listentry.FleetFinderEntry':
                 link = 'fleet:%s' % entry.fleet.fleetID
                 self.AddLink(entry.fleet.fleetName or localization.GetByLabel('UI/Common/Unknown'), link)
             elif entry.__guid__ in ('xtriui.ListSurroundingsBtn', 'listentry.LocationTextEntry', 'listentry.LabelLocationTextTop', 'listentry.LocationGroup', 'listentry.LocationSearchItem'):
@@ -100,7 +100,7 @@ class EditPlainText(uicontrols.EditPlainTextCore):
                     label = localization.GetByLabel('UI/Corporations/Wars/Killmails/KillLinkStructure', typeName=shipName)
                 link = 'killReport:%d:%s' % (entry.mail.killID, hashValue)
                 self.AddLink(label, link)
-            elif entry.__guid__ in 'listentry.WarEntry':
+            elif entry.__guid__ == 'listentry.WarEntry':
                 warID = entry.war.warID
                 attackerID = entry.war.declaredByID
                 defenderID = entry.war.againstID
@@ -109,16 +109,16 @@ class EditPlainText(uicontrols.EditPlainTextCore):
                 label = localization.GetByLabel('UI/Corporations/Wars/WarReportLink', attackerName=attackerName, defenderName=defenderName)
                 link = 'warReport:%d' % warID
                 self.AddLink(label, link)
-            elif entry.__guid__ in 'listentry.TutorialEntry':
+            elif entry.__guid__ == 'listentry.TutorialEntry':
                 tutorialID = entry.tutorialID
                 link = 'tutorial:%s' % tutorialID
                 label = entry.label
                 self.AddLink(label, link)
-            elif entry.__guid__ in 'listentry.listentry.RecruitmentEntry':
+            elif entry.__guid__ == 'listentry.RecruitmentEntry':
                 label = '%s - %s ' % (cfg.eveowners.Get(entry.advert.corporationID).name, entry.adTitle)
                 link = 'recruitmentAd:' + str(entry.advert.corporationID) + '//' + str(entry.advert.adID)
                 self.AddLink(label, link)
-            elif entry.__guid__ in 'listentry.DirectionalScanResults':
+            elif entry.__guid__ == 'listentry.DirectionalScanResults':
                 label = entry.typeName
                 link = 'showinfo:' + str(entry.typeID) + '//' + str(entry.itemID)
                 self.AddLink(label, link, addLineBreak=True)
@@ -126,11 +126,15 @@ class EditPlainText(uicontrols.EditPlainTextCore):
                 label = evetypes.GetName(entry.invtype)
                 link = 'showinfo:' + str(entry.invtype)
                 self.AddLink(label, link)
+            elif entry.__guid__ == 'listentry.TutorialVideoItem':
+                label = entry.fullTitle
+                link = 'tutorialvideo:' + str(entry.id)
+                self.AddLink(label, link)
             elif entry.__guid__ in ('listentry.Item', 'listentry.ContractItemSelect', 'listentry.RedeemToken', 'listentry.FittingModuleEntry', 'listentry.KillItems'):
                 label = evetypes.GetName(entry.typeID)
                 link = 'showinfo:' + str(entry.typeID)
                 self.AddLink(label, link)
-            elif entry.__guid__ in ('listentry.PodGuideBrowseEntry',):
+            elif entry.__guid__ == 'listentry.PodGuideBrowseEntry':
                 label = entry.label
                 link = 'podGuideLink:%s' % entry.termID
                 self.AddLink(label, link)
@@ -152,6 +156,14 @@ class EditPlainText(uicontrols.EditPlainTextCore):
             elif getattr(entry, 'typeID', None) == typeSkinMaterial:
                 link = 'showinfo:' + str(entry.typeID) + '//' + str(entry.materialID)
                 self.AddLink(entry.label, link)
+            else:
+                try:
+                    label = entry.GetLabel()
+                    link = entry.GetLink()
+                except AttributeError:
+                    pass
+                else:
+                    self.AddLink(label, link)
 
     def ApplyGameSelection(self, what, data, changeObjs):
         if what == 6 and len(changeObjs):

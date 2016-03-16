@@ -40,29 +40,24 @@ class LookAnimation(object):
 
     def Stop(self):
         self.ending = True
-        if IsNewCameraActive():
-            self.camera.EnableManualControl()
 
     def Start(self):
         self.ending = False
         if IsNewCameraActive():
-            self.camera.DisableManualControl()
             uthread2.StartTasklet(self._DoCameraLookAnimation_Thread_New)
         else:
             uthread2.StartTasklet(self._DoCameraLookAnimation_Thread)
 
     def _DoCameraLookAnimation_Thread_New(self):
-        self.camera.targetTracker.TrackItem(None)
-        self.camera.SetCameraInterest(None)
         targetTranslation = self.startTranslation
-        direction = geo2.Vec3Scale(geo2.QuaternionTransformVector(self.rotation, (0, 0, 1)), -2 * targetTranslation)
+        direction = geo2.Vec3Scale(geo2.QuaternionTransformVector(self.rotation, (0, 0, 1)), -targetTranslation)
         atPosition = self._GetFocusPosition()
         eyePosition = geo2.Vec3Add(atPosition, direction)
-        self.camera.TransitTo(atPosition, eyePosition)
+        self.camera.TransitTo(atPosition, eyePosition, smoothing=0.0)
 
     def _DoCameraLookAnimation_Thread(self):
         self.camera.targetTracker.TrackItem(None)
-        self.camera.SetCameraInterest(None)
+        self.camera.Track(None)
         lookDir = geo2.QuaternionTransformVector(self.rotation, (0, 0, 1))
         lookDir = trinity.TriVector(lookDir[0], lookDir[1], lookDir[2])
         initialTranslation = self.camera.translationFromParent
@@ -104,11 +99,15 @@ class LookAnimation(object):
                     break
                 timeSinceEnd = blue.os.TimeDiffInMs(endedTime, curTime) / 1000.0
                 if timeSinceEnd >= self.cameraOutroDelay:
-                    itemID = self.GetJumpEndLookAtID()
-                    if itemID is not None:
-                        sm.GetService('state').SetState(itemID, states.selected, 1)
-                        self.camera.targetTracker.SetTemporaryTrackSpeed(itemID, math.pi / 4000)
+                    self.OnJumpDone()
                     break
+
+    def OnJumpDone(self):
+        itemID = self.GetJumpEndLookAtID()
+        if itemID is not None:
+            sm.GetService('state').SetState(itemID, states.selected, 1)
+            if not IsNewCameraActive():
+                self.camera.targetTracker.SetTemporaryTrackSpeed(itemID, math.pi / 4000)
 
     def GetJumpEndLookAtID(self):
         lookatID = self.endFocusID

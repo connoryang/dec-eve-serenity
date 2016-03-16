@@ -357,8 +357,6 @@ class Login(uicls.LayerCore):
     def LoadScene(self):
         self.camera = trinity.Load('res:/dx9/scene/login_screen_camera.red')
         self.scene = trinity.Load('res:/dx9/scene/login_screen.red')
-        if gfxutils.BlockStarfieldOnLionOSX():
-            self.scene.starfield = None
         blue.resMan.Wait()
         self.CheckHeightMaps()
         stations = self.scene.Find('trinity.EveStation2')

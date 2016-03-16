@@ -29,7 +29,7 @@ class Tracker(object):
         self.trackingController.isCenteredMode = self.isCenteredMode
 
     def TrackItem(self, itemID):
-        if itemID == self._cameraSvc.LookingAt():
+        if itemID == self._cameraSvc.GetLookAtItemID():
             return
         camera = sm.GetService('sceneManager').GetRegisteredCamera(evecamera.CAM_SPACE_PRIMARY)
         if camera is None:
@@ -91,7 +91,7 @@ class Tracker(object):
         camera = sm.GetService('sceneManager').GetRegisteredCamera(evecamera.CAM_SPACE_PRIMARY)
         if camera is None:
             return
-        shipBall = sm.GetService('michelle').GetBall(self._cameraSvc.LookingAt())
+        shipBall = sm.GetService('michelle').GetBall(self._cameraSvc.GetLookAtItemID())
         if shipBall is None:
             return
         itemBall = sm.GetService('michelle').GetBall(itemID)

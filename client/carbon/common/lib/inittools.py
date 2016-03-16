@@ -41,9 +41,7 @@ def run_(tool):
     lib27 = join(sharedTools, 'libs', 'lib27')
     sys.path.append(lib27)
     sys.path.append(join(lib27, 'bin', binstr))
-    sys.path.append(join(lib27, 'wx_29'))
-    sys.path.append(join(lib27, 'wx_29', 'bin', binstr))
-    sys.path.append(join(lib27, 'wx_29', 'VC100.SP1.bin', 'bin', binstr))
+    sys.path.append(join(lib27, 'wx_3020.' + binstr))
 
     def execIfExists(toolPath):
         path = '%s/startup/%s.py' % (toolPath, tool)

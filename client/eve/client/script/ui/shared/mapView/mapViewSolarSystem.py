@@ -54,8 +54,8 @@ class MapViewSolarSystem(Container):
     hilightID = None
     mapViewID = None
     sceneBlendMode = None
-    showSolarSystemNebula = True
-    showStarfield = True
+    showSolarSystemNebula = False
+    showStarfield = False
     showDebugInfo = False
     showInfobox = False
 
@@ -311,17 +311,6 @@ class MapViewSolarSystem(Container):
 
     def SetActiveMarker(self, markerObject, *args, **kwds):
         self.camera.FollowMarker(markerObject)
-
-    def LoadGenericBackdrop(self):
-        scene = self.scene
-        scene.backgroundEffect = trinity.Load('res:/dx9/scene/starfield/starfieldNebula.red')
-        scene.backgroundRenderingEnabled = True
-        node = nodemanager.FindNode(scene.backgroundEffect.resources, 'NebulaMap', 'trinity.TriTextureParameter')
-        if node is not None:
-            node.resourcePath = 'res:/UI/Texture/classes/MapView/backdrop_cube.dds'
-        node = nodemanager.FindNode(scene.backgroundEffect.resources, 'StarMap', 'trinity.TriTextureParameter')
-        if node is not None:
-            node.resourcePath = 'res:/dx9/scene/starfield/Stars01_Tile2_dim.dds'
 
     def LoadSolarSystemDetails(self, solarSystemID):
         current = getattr(self, 'currentSolarsystem', None)

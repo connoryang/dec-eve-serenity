@@ -156,6 +156,10 @@ class BaseLink(BaseLinkCore):
                      'applyingCorporationID',
                      'adID'], 'JoinRecruitingChannel', session.corpid, session.allianceid, channelID, corpID, adID)
             return True
+        if URL.startswith('tutorialvideo:'):
+            from eve.client.script.ui.shared.neocom.help import HelpWindow
+            HelpWindow.PlayVideoId(URL[len('tutorialvideo:'):])
+            return True
         return False
 
     @classmethod

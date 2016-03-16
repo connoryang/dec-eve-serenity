@@ -1,26 +1,28 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\inflight\bracketsAndTargets\targetInBar.py
-import _weakref
-import math
-from eve.client.script.ui.shared.stateFlag import AddAndSetFlagIcon
-import evetypes
-import uicontrols
+import base
 import blue
+import carbonui.const as uiconst
+import evetypes
+import localization
+import math
+import random
+import state
+import telemetry
+import trinity
+import uicls
+import uicontrols
 import uiprimitives
+import uiutil
+import uix
+import uthread
+import util
+import _weakref
+from eve.client.script.ui.inflight.moduleEffectTimer import ModuleEffectTimer
+from eve.client.script.ui.shared.stateFlag import AddAndSetFlagIcon
+from gametime import GetDurationInClient
 from spacecomponents.client.messages import MSG_ON_TARGET_BRACKET_ADDED, MSG_ON_TARGET_BRACKET_REMOVED
 from spacecomponents.common.componentConst import TURBO_SHIELD_CLASS
 from spacecomponents.common.helper import HasTurboShieldComponent
-import uthread
-import uix
-import uiutil
-import util
-import state
-import base
-import random
-import uicls
-import carbonui.const as uiconst
-import localization
-import telemetry
-import trinity
 accuracyThreshold = 0.8
 SHIELD = 0
 ARMOR = 1
@@ -121,7 +123,11 @@ class TargetInBar(uicontrols.ContainerAutoSize):
 
         self.UpdateDrones()
         for moduleInfo in sm.GetService('godma').GetStateManager().GetActiveModulesOnTargetID(slimItem.itemID):
-            self.AddWeapon(moduleInfo)
+            if moduleInfo:
+                moduleID = moduleInfo.itemID
+                if moduleID and moduleID not in self.activeModules:
+                    self.AddWeapon(moduleInfo)
+                    self.activeModules[moduleID] = moduleInfo
 
     def AddUIObjects(self, slimItem, itemID, *args):
         barAndImageCont = uiprimitives.Container(parent=self, name='barAndImageCont', align=uiconst.TOTOP, height=100, state=uiconst.UI_NORMAL)
@@ -215,6 +221,9 @@ class TargetInBar(uicontrols.ContainerAutoSize):
     def OnJamStart(self, sourceBallID, moduleID, targetBallID, jammingType, startTime, duration):
         if targetBallID != self.id:
             return
+        durationInClient = GetDurationInClient(startTime, duration)
+        if durationInClient < 0.0:
+            return
         moduleInfo = self.GetModuleInfo(moduleID)
         if moduleInfo and moduleID not in self.activeModules:
             self.AddWeapon(moduleInfo)
@@ -224,7 +233,7 @@ class TargetInBar(uicontrols.ContainerAutoSize):
          targetBallID,
          startTime,
          duration)
-        self.StartTimer(moduleID, duration)
+        self.StartTimer(moduleID, durationInClient)
 
     def OnJamEnd(self, sourceBallID, moduleID, targetBallID, jammingType):
         if not self or self.destroyed:
@@ -242,59 +251,15 @@ class TargetInBar(uicontrols.ContainerAutoSize):
 
     def StartTimer(self, moduleID, duration, *args):
         moduleIconCont = self.GetWeapon(moduleID)
-        if moduleIconCont and moduleIconCont.icon:
+        if moduleIconCont and moduleIconCont.icon and moduleIconCont.timer:
             moduleIconCont.icon.SetRGB(1, 1, 1, 1.0)
             moduleIconCont.icon.baseAlpha = 1.0
-            leftTimer, rightTimer = self.GetTimers(moduleIconCont)
-            durationInSec = duration / 1000
-            curvePoints = ([0, math.pi], [0.5, 0], [1, 0])
-            uicore.animations.MorphScalar(rightTimer, 'rotationSecondary', duration=durationInSec, curveType=curvePoints)
-            curvePoints = ([0, 0], [0.5, 0], [1, -math.pi])
-            uicore.animations.MorphScalar(leftTimer, 'rotationSecondary', duration=durationInSec, curveType=curvePoints)
-            blinkIn = max(2, durationInSec - 5)
-            timerName = 'ecmTimer_%s' % moduleID
-            setattr(self, timerName, base.AutoTimer(blinkIn * 1000, self.BlinkModule, moduleID))
-
-    def BlinkModule(self, moduleID, *args):
-        timerName = 'ecmTimer_%s' % moduleID
-        setattr(self, timerName, None)
-        moduleIconCont = self.GetWeapon(moduleID)
-        if moduleIconCont and not moduleIconCont.destroyed:
-            duration = 1.0
-            numLoops = 5 / duration
-            uicore.animations.BlinkIn(moduleIconCont, startVal=0.0, endVal=1.0, duration=duration, loops=numLoops)
-
-    def GetTimers(self, moduleIconCont, *args):
-        right = getattr(moduleIconCont, 'rightSide', None)
-        left = getattr(moduleIconCont, 'leftSide', None)
-        if not right or right.destroyed:
-            rightSide = uiprimitives.Sprite(name='rightSide', parent=moduleIconCont, align=uiconst.TOALL, texturePath='res:/UI/Texture/classes/Target/ecmCounterRight.png', textureSecondaryPath='res:/UI/Texture/classes/Target/ecmCounterGauge.png', blendMode=1, spriteEffect=trinity.TR2_SFX_MODULATE, state=uiconst.UI_DISABLED)
-            rightSide.SetRGB(0.5, 0.5, 0.5, 0.5)
-        else:
-            rightSide = right
-        if not left or left.destroyed:
-            leftSide = uiprimitives.Sprite(name='leftSide', parent=moduleIconCont, align=uiconst.TOALL, texturePath='res:/UI/Texture/classes/Target/ecmCounterLeft.png', textureSecondaryPath='res:/UI/Texture/classes/Target/ecmCounterGauge.png', blendMode=1, spriteEffect=trinity.TR2_SFX_MODULATE, state=uiconst.UI_DISABLED)
-            leftSide.SetRGB(0.5, 0.5, 0.5, 0.5)
-        else:
-            leftSide = left
-        leftSide.baseRotation = math.pi
-        leftSide.rotationSecondary = leftSide.baseRotation
-        rightSide.baseRotation = 0
-        rightSide.rotationSecondary = rightSide.baseRotation
-        moduleIconCont.rightSide = rightSide
-        moduleIconCont.leftSide = leftSide
-        return (leftSide, rightSide)
+            moduleIconCont.timer.StartTimer(duration)
 
     def RemoveTimer(self, moduleID, *args):
         moduleIconCont = self.GetWeapon(moduleID)
-        if not moduleIconCont or moduleIconCont.destroyed:
-            return
-        moduleIconCont.icon.SetRGB(1, 1, 1, moduleIconCont.icon.baseAlpha)
-        for sideName in ('leftSide', 'rightSide'):
-            side = getattr(moduleIconCont, sideName, None)
-            if side:
-                side.Close()
-                setattr(moduleIconCont, sideName, None)
+        if moduleIconCont and moduleIconCont.icon and moduleIconCont.timer:
+            moduleIconCont.icon.SetRGB(1, 1, 1, moduleIconCont.icon.baseAlpha)
 
     def _HoverThread(self):
         while True:
@@ -393,6 +358,10 @@ class TargetInBar(uicontrols.ContainerAutoSize):
         else:
             icon.baseAlpha = 1.0
         icon.SetAlpha(icon.baseAlpha)
+        timerRightCounterTexturePath = 'res:/UI/Texture/classes/Target/ecmCounterRight.png'
+        timerLeftCounterTexturePath = 'res:/UI/Texture/classes/Target/ecmCounterLeft.png'
+        timerCounterGaugeTexturePath = 'res:/UI/Texture/classes/Target/ecmCounterGauge.png'
+        cont.timer = ModuleEffectTimer(parent=cont, blink=True, timerRightCounterTexturePath=timerRightCounterTexturePath, timerLeftCounterTexturePath=timerLeftCounterTexturePath, timerCounterGaugeTexturePath=timerCounterGaugeTexturePath)
         self.ArrangeWeapons()
         self.SetSizeAutomatically()
         uthread.new(sm.GetService('target').AdjustRowSize)

@@ -470,6 +470,10 @@ class ButtonIcon(Container):
     default_iconColor = None
     default_colorSelected = None
     default_isHoverBGUsed = None
+    default_isSelectedBgUsed = False
+    default_hoverTexture = None
+    default_downTexture = None
+    default_showGlow = True
 
     def ApplyAttributes(self, attributes):
         Container.ApplyAttributes(self, attributes)
@@ -480,8 +484,12 @@ class ButtonIcon(Container):
         self.iconSize = attributes.get('iconSize', self.default_iconSize)
         self.iconColor = attributes.get('iconColor', self.default_iconColor)
         self.isHoverBGUsed = attributes.Get('isHoverBGUsed', self.default_isHoverBGUsed)
+        self.isSelectedBgUsed = attributes.Get('isSelectedBgUsed', self.default_isSelectedBgUsed)
         self.colorSelected = attributes.Get('colorSelected', self.default_colorSelected)
         self.rotation = attributes.Get('rotation', self.default_rotation)
+        self.hoverTexture = attributes.Get('hoverTexture', self.default_hoverTexture)
+        self.downTexture = attributes.Get('downTexture', self.default_downTexture)
+        self.showGlow = attributes.Get('showGlow', self.default_showGlow)
         if self.isHoverBGUsed is None:
             if self.iconSize < self.default_noBgSize:
                 self.isHoverBGUsed = True
@@ -497,6 +505,8 @@ class ButtonIcon(Container):
         self.bgContainer = bgCont
         self.selectedBG = None
         self.ConstructBackground()
+        if self.isSelectedBgUsed:
+            self.ConstructSelectedBackground()
         self.blinkBg = None
         self.SetActive(self.isActive, animate=False)
 
@@ -523,6 +533,7 @@ class ButtonIcon(Container):
         if self.selectedBG:
             return
         self.selectedBG = FillThemeColored(name='selectedBG', bgParent=self.bgContainer, colorType=uiconst.COLORTYPE_UIHILIGHT, idx=0, color=self.colorSelected)
+        self.UpdateSelectedColor()
 
     def AccessIcon(self):
         return self.icon
@@ -545,22 +556,28 @@ class ButtonIcon(Container):
         self.icon.SetRotation(value)
 
     def UpdateIconState(self, animate = True):
-        if self.isSelected:
-            glowAmount = 0.3
-        elif uicore.uilib.mouseOver == self:
+        texturePath = None
+        if uicore.uilib.mouseOver == self:
             if uicore.uilib.leftbtn:
                 glowAmount = self.OPACITY_MOUSECLICK
+                texturePath = self.downTexture
             else:
                 glowAmount = self.OPACITY_MOUSEHOVER
+                texturePath = self.hoverTexture
         elif self.isActive:
             glowAmount = self.OPACITY_IDLE
+            texturePath = self.texturePath
         else:
             glowAmount = self.OPACITY_INACTIVE
+            texturePath = self.texturePath
         if isinstance(self.icon, GlowSprite):
-            if animate:
-                uicore.animations.MorphScalar(self.icon, 'glowAmount', self.icon.glowAmount, glowAmount, duration=0.2)
-            else:
-                self.icon.glowAmount = glowAmount
+            if self.downTexture:
+                self.SetTexturePath(texturePath)
+            if self.showGlow:
+                if animate:
+                    uicore.animations.MorphScalar(self.icon, 'glowAmount', self.icon.glowAmount, glowAmount, duration=0.2)
+                else:
+                    self.icon.glowAmount = glowAmount
 
     def SetActive(self, isActive, animate = True):
         self.UpdateIconState(animate)
@@ -570,10 +587,7 @@ class ButtonIcon(Container):
         if self.isSelected:
             return
         self.isSelected = True
-        self.ConstructSelectedBackground()
-        self.selectedBG.opacity = self.OPACITY_SELECTED
-        iconColor = GetIconColor(self.colorSelected)
-        self.icon.SetRGBA(*iconColor)
+        self.UpdateSelectedColor()
         self.UpdateIconState()
 
     @telemetry.ZONE_METHOD
@@ -581,10 +595,21 @@ class ButtonIcon(Container):
         if not self.isSelected:
             return
         self.isSelected = False
-        if self.selectedBG:
-            self.selectedBG.opacity = 0.0
-        self.icon.SetRGBA(*self.COLOR_DEFAULT)
+        self.UpdateSelectedColor()
         self.UpdateIconState()
+
+    def UpdateSelectedColor(self):
+        if self.isSelected:
+            if self.selectedBG:
+                self.selectedBG.opacity = self.OPACITY_SELECTED
+                iconColor = GetIconColor(self.colorSelected)
+            else:
+                iconColor = self.colorSelected
+        else:
+            if self.selectedBG:
+                self.selectedBG.opacity = 0.0
+            iconColor = self.COLOR_DEFAULT
+        self.icon.SetRGBA(*iconColor)
 
     def Blink(self, duration = 0.8, loops = 1):
         self.ConstructBlinkBackground()
@@ -608,7 +633,7 @@ class ButtonIcon(Container):
 
     def OnMouseEnter(self, *args):
         self.StopBlink()
-        if not self.enabled or self.isSelected:
+        if not self.enabled:
             return
         self.UpdateIconState()
         if self.isHoverBGUsed:

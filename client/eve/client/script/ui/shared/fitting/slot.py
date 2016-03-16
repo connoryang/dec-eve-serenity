@@ -1,7 +1,9 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\fitting\slot.py
 from carbonui.primitives.sprite import Sprite
 from carbonui.primitives.transform import Transform
+from eve.client.script.ui.shared.fitting.baseSlot import FittingSlotBase
 from eve.client.script.ui.shared.fitting.fittingUtil import GetScaleFactor, RigFittingCheck
+from eve.client.script.ui.shared.fitting.utilBtns import FittingUtilBtn, UtilBtnData
 import evetypes
 import uicontrols
 import uix
@@ -25,7 +27,7 @@ import inventorycommon.typeHelpers
 MAXMODULEHINTWIDTH = 300
 logger = logging.getLogger(__name__)
 
-class FittingSlot(Transform):
+class FittingSlot(FittingSlotBase):
     __guid__ = 'xtriui.FittingSlot2'
     __notifyevents__ = ['OnRefreshModuleBanks']
     default_name = 'fittingSlot'
@@ -34,23 +36,23 @@ class FittingSlot(Transform):
     default_align = uiconst.TOPLEFT
     default_state = uiconst.UI_NORMAL
     isDragObject = True
+    slotsToHintDict = {'hiSlot': ('UI/Fitting/EmptyHighPowerSlot', 'EmptyHighSlot'),
+     'medSlot': ('UI/Fitting/EmptyMediumPowerSlot', 'EmptyMidSlot'),
+     'loSlot': ('UI/Fitting/EmptyLowPowerSlot', 'EmptyLowSlot'),
+     'subSystemSlot': ('UI/Fitting/EmptySubsystemSlot', ''),
+     'rigSlot': ('UI/Fitting/EmptyRigSlot', '')}
 
     @telemetry.ZONE_METHOD
     def ApplyAttributes(self, attributes):
-        Transform.ApplyAttributes(self, attributes)
+        FittingSlotBase.ApplyAttributes(self, attributes)
         self.flagIcon = uicontrols.Icon(parent=self, name='flagIcon', align=uiconst.CENTER, state=uiconst.UI_DISABLED, width=self.width, height=self.height)
         self.sr.underlay = Sprite(bgParent=self, name='underlay', state=uiconst.UI_DISABLED, padding=(-10, -5, -10, -5), texturePath='res:/UI/Texture/Icons/81_64_1.png')
         self.groupMark = None
         self.chargeIndicator = None
         sm.RegisterNotify(self)
         self.radCosSin = attributes.radCosSin
-        self.controller = attributes.controller
-        self.utilButtons = []
-        self._emptyHint, self._emptyTooltip = self.PrimeToEmptySlotHint()
         self.invReady = 1
         self.UpdateFitting()
-        self.controller.on_online_state_change.connect(self.UpdateOnlineDisplay)
-        self.controller.on_item_fitted.connect(self.UpdateFitting)
 
     def ConstructGroupMark(self):
         if self.groupMark:
@@ -134,23 +136,23 @@ class FittingSlot(Transform):
         self.utilButtons = []
         if not self.controller.GetModule():
             return
-        toggleLabel = localization.GetByLabel('UI/Fitting/PutOffline') if bool(self.controller.IsOnline) is True else localization.GetByLabel('UI/Fitting/PutOnline')
         myrad, cos, sin, cX, cY = self.radCosSin
+        btns = self.GetUtilBtns()
+        rad = myrad - 34
+        i = 0
+        for btnData in btns:
+            left = int((rad - i * 16) * cos) + cX - 16 / 2
+            top = int((rad - i * 16) * sin) + cY - 16 / 2
+            utilBtn = FittingUtilBtn(parent=self.parent, icon=btnData.iconPath, left=left, top=top, btnData=btnData, mouseOverFunc=self.ShowUtilButtons, controller=self.controller)
+            if btnData.onlineBtn == 1:
+                self.sr.onlineButton = utilBtn
+            self.utilButtons.append(utilBtn)
+            i += 1
+
+    def GetUtilBtns(self):
         btns = []
         if self.controller.GetCharge():
-            btns += [(localization.GetByLabel('UI/Fitting/RemoveCharge'),
-              'ui_38_16_200',
-              self.controller.Unfit,
-              1,
-              0), (localization.GetByLabel('UI/Fitting/ShowChargeInfo'),
-              'ui_38_16_208',
-              self.ShowChargeInfo,
-              1,
-              0), ('',
-              inventorycommon.typeHelpers.GetIconFile(self.controller.GetModuleTypeID()),
-              None,
-              1,
-              0)]
+            btns += self.GetChargesBtns()
         isRig = False
         for effect in cfg.dgmtypeeffects.get(self.controller.GetModuleTypeID(), []):
             if effect.effectID == const.effectRigSlot:
@@ -160,84 +162,20 @@ class FittingSlot(Transform):
         isSubSystem = evetypes.GetCategoryID(self.controller.GetModuleTypeID()) == const.categorySubSystem
         isOnlinable = self.controller.IsOnlineable()
         if isRig:
-            btns += [(localization.GetByLabel('UI/Fitting/Destroy'),
-              'ui_38_16_200',
-              self.controller.Unfit,
-              1,
-              0), (localization.GetByLabel('UI/Commands/ShowInfo'),
-              'ui_38_16_208',
-              self.ShowInfo,
-              1,
-              0)]
+            btns += self.GetRigsBtns()
         elif isSubSystem:
-            btns += [(localization.GetByLabel('UI/Commands/ShowInfo'),
-              'ui_38_16_208',
-              self.ShowInfo,
-              1,
-              0)]
+            btns += self.GetSubSystemBtns()
         else:
-            btns += [(localization.GetByLabel('UI/Fitting/UnfitModule'),
-              'ui_38_16_200',
-              self.controller.UnfitModule,
-              1,
-              0), (localization.GetByLabel('UI/Commands/ShowInfo'),
-              'ui_38_16_208',
-              self.ShowInfo,
-              1,
-              0), (toggleLabel,
-              'ui_38_16_207',
-              self.ToggleOnline,
-              isOnlinable,
-              1)]
-        rad = myrad - 34
-        i = 0
-        for hint, icon, func, active, onlinebtn in btns:
-            left = int((rad - i * 16) * cos) + cX - 16 / 2
-            top = int((rad - i * 16) * sin) + cY - 16 / 2
-            icon = uicontrols.Icon(icon=icon, parent=self.parent, pos=(left,
-             top,
-             16,
-             16), idx=0, pickRadius=-1, ignoreSize=True)
-            icon.OnMouseEnter = self.ShowUtilButtons
-            icon.hint = hint
-            icon.color.a = 0.0
-            icon.isActive = active
-            if active:
-                icon.OnClick = func
-            elif self.controller.GetModule() is None or self.controller.SlotExists():
-                icon.hint = localization.GetByLabel('UI/Fitting/Disabled', moduleName=hint)
-            else:
-                icon.hint = localization.GetByLabel('UI/Fitting/CantOnlineIllegalSlot')
-            if onlinebtn == 1:
-                self.sr.onlineButton = icon
-            self.utilButtons.append(icon)
-            i += 1
+            btns += self.GetModuleBtns(isOnlinable)
+        return btns
 
-    def PrimeToEmptySlotHint(self):
-        if self.controller.GetFlagID() in const.hiSlotFlags:
-            return (localization.GetByLabel('UI/Fitting/EmptyHighPowerSlot'), 'EmptyHighSlot')
-        if self.controller.GetFlagID() in const.medSlotFlags:
-            return (localization.GetByLabel('UI/Fitting/EmptyMediumPowerSlot'), 'EmptyMidSlot')
-        if self.controller.GetFlagID() in const.loSlotFlags:
-            return (localization.GetByLabel('UI/Fitting/EmptyLowPowerSlot'), 'EmptyLowSlot')
-        if self.controller.GetFlagID() in const.subSystemSlotFlags:
-            return (localization.GetByLabel('UI/Fitting/EmptySubsystemSlot'), '')
-        if self.controller.GetFlagID() in const.rigSlotFlags:
-            return (localization.GetByLabel('UI/Fitting/EmptyRigSlot'), '')
-        return (localization.GetByLabel('UI/Fitting/EmptySlot'), '')
+    def GetChargesBtns(self):
+        btns = [UtilBtnData(localization.GetByLabel('UI/Fitting/RemoveCharge'), 'ui_38_16_200', self.controller.Unfit, 1, 0), UtilBtnData(localization.GetByLabel('UI/Fitting/ShowChargeInfo'), 'ui_38_16_208', self.ShowChargeInfo, 1, 0), UtilBtnData('', inventorycommon.typeHelpers.GetIconFile(self.controller.GetModuleTypeID()), None, 1, 0)]
+        return btns
 
-    def DisableSlot(self):
-        self.opacity = 0.1
-        self.state = uiconst.UI_DISABLED
-        self.flagIcon.state = uiconst.UI_HIDDEN
-
-    def EnableSlot(self):
-        self.opacity = 1.0
-        self.state = uiconst.UI_NORMAL
-        self.flagIcon.state = uiconst.UI_DISABLED
-
-    def HideSlot(self):
-        self.state = uiconst.UI_HIDDEN
+    def GetSubSystemBtns(self):
+        btns = [UtilBtnData(localization.GetByLabel('UI/Commands/ShowInfo'), 'ui_38_16_208', self.ShowInfo, 1, 0)]
+        return btns
 
     @telemetry.ZONE_METHOD
     def UpdateFitting(self):
@@ -250,10 +188,7 @@ class FittingSlot(Transform):
                 self.DisableSlot()
             return
         self.EnableSlot()
-        if not self.controller.GetModule() and not self.controller.GetCharge():
-            self.DisableDrag()
-        elif self.controller.SlotExists():
-            self.EnableDrag()
+        self.SetDragState()
         if self.controller.GetCharge():
             chargeQty = self.controller.GetChargeQuantity()
             if self.controller.GetModule() is None:
@@ -324,30 +259,6 @@ class FittingSlot(Transform):
         self.UpdateOnlineDisplay()
         self.Hilite(0)
 
-    def ColorUnderlay(self, color = None):
-        a = self.sr.underlay.color.a
-        r, g, b = color or (1.0, 1.0, 1.0)
-        self.sr.underlay.color.SetRGB(r, g, b, a)
-        self.UpdateOnlineDisplay()
-
-    def UpdateOnlineDisplay(self):
-        if self.controller.parentController.GetItemID() == self.controller.dogmaLocation.shipIDBeingDisembarked:
-            return
-        if self.controller.GetModule() is not None and self.controller.IsOnlineable():
-            if self.controller.IsOnline():
-                self.flagIcon.SetRGBA(1.0, 1.0, 1.0, 1.0)
-                if util.GetAttrs(self, 'sr', 'onlineButton') and self.sr.onlineButton.hint == localization.GetByLabel('UI/Fitting/PutOnline'):
-                    self.sr.onlineButton.hint = localization.GetByLabel('UI/Fitting/PutOffline')
-            else:
-                self.flagIcon.SetRGBA(1.0, 1.0, 1.0, 0.25)
-                if util.GetAttrs(self, 'sr', 'onlineButton') and self.sr.onlineButton.hint == localization.GetByLabel('UI/Fitting/PutOffline'):
-                    self.sr.onlineButton.hint = localization.GetByLabel('UI/Fitting/PutOnline')
-        elif self.flagIcon:
-            if self.controller.GetModule() is None or self.controller.SlotExists():
-                self.flagIcon.SetRGBA(1.0, 1.0, 1.0, 1.0)
-            else:
-                self.flagIcon.SetRGBA(0.7, 0.0, 0.0, 0.5)
-
     def IsCharge(self, typeID):
         return evetypes.GetCategoryID(typeID) == const.categoryCharge
 
@@ -395,20 +306,7 @@ class FittingSlot(Transform):
 
     def GetMenu(self):
         if self.controller.GetModuleTypeID() and self.controller.GetModuleID():
-            m = []
-            if eve.session.role & (service.ROLE_GML | service.ROLE_WORLDMOD):
-                m += [(str(self.controller.GetModuleID()), self.CopyItemIDToClipboard, (self.controller.GetModuleID(),)), None]
-            m += [(uiutil.MenuLabel('UI/Commands/ShowInfo'), self.ShowInfo)]
-            if self.controller.IsRigSlot():
-                m += [(uiutil.MenuLabel('UI/Fitting/Destroy'), self.controller.Unfit)]
-            else:
-                if session.stationid2 is not None:
-                    m += [(uiutil.MenuLabel('UI/Fitting/Unfit'), self.controller.Unfit)]
-                if self.controller.IsOnlineable():
-                    if self.controller.IsOnline():
-                        m.append((uiutil.MenuLabel('UI/Fitting/PutOffline'), self.ToggleOnline))
-                    else:
-                        m.append((uiutil.MenuLabel('UI/Fitting/PutOnline'), self.ToggleOnline))
+            m = FittingSlotBase.GetMenu(self)
             m += self.GetGroupMenu()
             return m
 
@@ -418,24 +316,9 @@ class FittingSlot(Transform):
             return [(uiutil.MenuLabel('UI/Fitting/ClearGroup'), self.UnlinkModule, ())]
         return []
 
-    def OnClick(self, *args):
-        uicore.registry.SetFocus(self)
-        if self.controller.IsOnlineable():
-            self.ToggleOnline()
-
-    def ToggleOnline(self):
-        self.controller.ToggleOnlineModule()
-        self.UpdateOnlineDisplay()
-
-    def CopyItemIDToClipboard(self, itemID):
-        blue.pyos.SetClipboardData(str(itemID))
-
     def ShowChargeInfo(self, *args):
         if self.controller.GetCharge():
             sm.GetService('info').ShowInfo(self.controller.GetCharge().typeID, self.controller.GetCharge().itemID)
-
-    def ShowInfo(self, *args):
-        sm.GetService('info').ShowInfo(self.controller.GetModuleTypeID(), self.controller.GetModuleID())
 
     def UnlinkModule(self):
         self.controller.DestroyWeaponBank()
@@ -446,18 +329,6 @@ class FittingSlot(Transform):
     def OnEndDrag(self, *args):
         if self.controller.GetModule() is not None:
             sm.ScatterEvent('OnResetSlotLinkingMode', self.controller.GetModule().typeID)
-
-    def OnMouseEnter(self, *args):
-        if self.controller.GetModule() is not None:
-            self.ShowUtilButtons()
-        else:
-            self.hint = self._emptyHint
-            self.Hilite(1)
-            uicore.Message('ListEntryEnter')
-
-    def OnMouseExit(self, *args):
-        if not self.controller.GetModule():
-            self.Hilite(0)
 
     def GetTooltipPosition(self):
         rect, point = self.PositionHint()
@@ -506,46 +377,6 @@ class FittingSlot(Transform):
           hintTop + cY - 15,
           30,
           30), point)
-
-    def ShowUtilButtons(self, *args):
-        fittingbase = self.FindParentByName('fittingBase')
-        fittingbase.ClearSlotsWithMenu()
-        fittingbase.AddToSlotsWithMenu(self)
-        for button in self.utilButtons:
-            if button.isActive:
-                button.color.a = 1.0
-            else:
-                button.color.a = 0.25
-
-        self.utilButtonsTimer = base.AutoTimer(500, self.HideUtilButtons)
-
-    def HideUtilButtons(self, force = 0):
-        mo = uicore.uilib.mouseOver
-        if not force and (mo in self.utilButtons or mo == self or uiutil.IsUnder(mo, self)):
-            return
-        for button in self.utilButtons:
-            button.color.a = 0.0
-
-        self.utilButtonsTimer = None
-
-    def Hilite(self, state):
-        if state:
-            self.sr.underlay.color.a = 1.0
-        else:
-            self.sr.underlay.color.a = 0.3
-
-    def GetDragData(self, *args):
-        return self.controller.GetDragData()
-
-    def HiliteIfMatching(self, flagID, powerType):
-        if flagID is None and powerType is None:
-            if self.controller.GetModuleID() is None:
-                self.Hilite(0)
-        elif self.state != uiconst.UI_DISABLED and self.controller.GetModuleID() is None:
-            if powerType is not None and self.controller.GetPowerType() == powerType:
-                self.Hilite(1)
-            if flagID is not None and self.controller.GetFlagID() == flagID:
-                self.Hilite(1)
 
     def OnDropData(self, dragObj, nodes):
         if self.controller.GetModule() is not None and not self.controller.SlotExists():

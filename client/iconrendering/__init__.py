@@ -34,7 +34,8 @@ NON_ICON_CATEGORIES = (const.categoryCelestial,
  const.categoryStarbase,
  const.categorySovereigntyStructure,
  const.categoryPlanetaryInteraction,
- const.categoryOrbital)
+ const.categoryOrbital,
+ const.categoryFighter)
 
 class IconRenderingException(Exception):
     pass

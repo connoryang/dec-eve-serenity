@@ -150,6 +150,10 @@ class ShipTreeShipIcon(Container):
         uicore.animations.Tr2DScaleTo(self.iconTransform, self.iconTransform.scale, (1.0, 1.0), duration=0.3)
         sm.GetService('audio').SendUIEvent('ui_shipsound_stop')
 
+    def Close(self):
+        Container.Close(self)
+        sm.GetService('audio').SendUIEvent('ui_shipsound_stop')
+
     def GetMenu(self):
         return sm.GetService('menu').GetMenuFormItemIDTypeID(None, self.typeID, ignoreMarketDetails=False)
 

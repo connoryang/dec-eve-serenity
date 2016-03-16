@@ -4,6 +4,8 @@ from math import sqrt
 import dogma.effects
 from dogma.const import falloffEffectivnessModuleGroups
 from eve.client.script.parklife import tacticalConst
+from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive
+import evecamera
 import evetypes
 import service
 import uicontrols
@@ -667,23 +669,34 @@ class TacticalSvc(service.Service):
             self.HideTacticalOverlay()
 
     def HideTacticalOverlay(self):
-        self._SetTacticalOverlayInactive()
+        self._SetTacticalOverlayActive(False)
         self.TearDownOverlay()
         sm.ScatterEvent('OnTacticalOverlayChange')
 
-    def _SetTacticalOverlayInactive(self):
-        settings.user.overview.Set('viewTactical', False)
+    def _SetTacticalOverlayActive(self, isActive):
+        if IsNewCameraActive():
+            cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
+            if cam.cameraID == evecamera.CAM_TACTICAL:
+                settings.user.overview.Set('viewTactical_camTactical', isActive)
+            else:
+                settings.user.overview.Set('viewTactical', isActive)
+        else:
+            settings.user.overview.Set('viewTactical', isActive)
 
     def ShowTacticalOverlay(self):
-        self._SetTacticalOverlayActive()
+        self._SetTacticalOverlayActive(True)
         self.Init()
         sm.ScatterEvent('OnTacticalOverlayChange')
 
-    def _SetTacticalOverlayActive(self):
-        settings.user.overview.Set('viewTactical', True)
-
     def IsTacticalOverlayActive(self):
-        return settings.user.overview.Get('viewTactical', 0)
+        if IsNewCameraActive():
+            cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
+            if cam.cameraID == evecamera.CAM_TACTICAL:
+                return settings.user.overview.Get('viewTactical_camTactical', True)
+            else:
+                return settings.user.overview.Get('viewTactical', False)
+        else:
+            return settings.user.overview.Get('viewTactical', False)
 
     def CheckInit(self):
         if eve.session.solarsystemid and self.IsTacticalOverlayActive():
@@ -769,7 +782,7 @@ class TacticalSvc(service.Service):
             if scene is None:
                 return
             for each in scene.objects:
-                if each.name == 'TacticalMap':
+                if getattr(each, 'name', None) == 'TacticalMap':
                     rm.append(each)
 
             for each in rm:
@@ -1175,7 +1188,8 @@ class TacticalSvc(service.Service):
             del self.jammers[sourceBallID][jammingType]
         if jammingType in self.jammersByJammingType and (sourceBallID, moduleID) in self.jammersByJammingType[jammingType]:
             self.jammersByJammingType[jammingType].remove((sourceBallID, moduleID))
-        sm.ScatterEvent('OnEwarEndFromTactical')
+        ewarId = (sourceBallID, moduleID, targetBallID)
+        sm.ScatterEvent('OnEwarEndFromTactical', jammingType, ewarId)
 
     def OnEwarOnConnect(self, shipID, m, moduleTypeID, targetID, *args):
         if targetID != session.shipid:

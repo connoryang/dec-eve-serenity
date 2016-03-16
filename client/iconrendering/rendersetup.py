@@ -318,7 +318,7 @@ def IgnoreGraphicID(resourceMapper, graphicID):
 
 
 def YieldAllRenderFuncsAndArgsForGraphics(resourceMapper, outputFolder, logger, blueprintGraphicIDs, graphicIDs = None):
-    if graphicIDs:
+    if graphicIDs is not None:
         ids = graphicIDs
     else:
         ids = resourceMapper.GetAllGraphicIDs()

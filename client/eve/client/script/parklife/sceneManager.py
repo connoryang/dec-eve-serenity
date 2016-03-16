@@ -10,12 +10,10 @@ import util
 import log
 import trinity
 import service
-import nodemanager
 import locks
 import geo2
 import sys
 import evegraphics.settings as gfxsettings
-import evegraphics.utils as gfxutils
 from eve.client.script.parklife.sceneManagerConsts import *
 from eve.client.script.ui.view.viewStateConst import ViewState
 
@@ -63,7 +61,6 @@ class SceneManager(service.Service):
         self._sharedResources = {}
         self.routeVisualizer = None
         self.podDeathScene = None
-        self.particlePoolManager = trinity.Tr2GPUParticlePoolManager()
         if '/skiprun' not in blue.pyos.GetArg():
             self._EnableLoadingClear()
         limit = gfxsettings.Get(gfxsettings.GFX_LOD_QUALITY) * 30
@@ -149,9 +146,8 @@ class SceneManager(service.Service):
             self.explosionManager.SetLimit(limit)
         if gfxsettings.UI_CAMERA_OFFSET in changes:
             self.CheckCameraOffsets()
-        if gfxsettings.UI_INCARNA_CAMERA_OFFSET in changes:
             sm.GetService('cameraClient').CheckCameraOffsets()
-        if gfxsettings.UI_INCARNA_CAMERA_MOUSE_LOOK_SPEED in changes:
+        if gfxsettings.UI_CAMERA_SPEED in changes:
             sm.GetService('cameraClient').CheckMouseLookSpeed()
         if gfxsettings.MISC_LOAD_STATION_ENV in changes:
             val = gfxsettings.Get(gfxsettings.MISC_LOAD_STATION_ENV)
@@ -162,9 +158,6 @@ class SceneManager(service.Service):
             if gfxsettings.UI_TRAILS_ENABLED in changes or gfxsettings.UI_EFFECTS_ENABLED in changes:
                 trailsEnabled = effectsEnabled and gfxsettings.Get(gfxsettings.UI_TRAILS_ENABLED)
                 trinity.settings.SetValue('eveSpaceObjectTrailsEnabled', trailsEnabled)
-            if gfxsettings.UI_GPU_PARTICLES_ENABLED in changes or gfxsettings.UI_EFFECTS_ENABLED in changes:
-                gpuParticlesEnabled = effectsEnabled and gfxsettings.Get(gfxsettings.UI_GPU_PARTICLES_ENABLED)
-                trinity.settings.SetValue('gpuParticlesEnabled', gpuParticlesEnabled)
             if gfxsettings.UI_GODRAYS in changes:
                 scene = self.GetRegisteredScene('default')
                 if scene is not None and scene.sunBall is not None:
@@ -270,6 +263,7 @@ class SceneManager(service.Service):
             camera.OnActivated(lastCamera=currCam, **kwargs)
         if currCam and hasattr(currCam, 'OnDeactivated'):
             currCam.OnDeactivated()
+        self.UpdateBracketProjectionCamera()
 
     def GetActiveCameraMode(self):
         return self.activeCameraMode
@@ -287,14 +281,20 @@ class SceneManager(service.Service):
 
     @telemetry.ZONE_METHOD
     def SetActiveCamera(self, camera, **kwargs):
-        uicore.uilib.SetSceneCamera(camera)
         if camera == self.GetActiveCamera():
             return
-        if self.secondaryJob is None:
+        cameraID = getattr(camera, 'cameraID', None)
+        isInspaceCam = cameraID in evecamera.INSPACE_CAMERAS
+        if self.secondaryJob is None or isInspaceCam:
             renderJob = self.primaryJob
         else:
             renderJob = self.secondaryJob
         self._ApplyCamera(renderJob, camera, **kwargs)
+
+    def UpdateBracketProjectionCamera(self):
+        camera = self.GetActiveCamera()
+        if camera:
+            uicore.uilib.SetSceneCamera(camera)
 
     def SetActiveCameraByID(self, cameraID, **kwargs):
         activeCam = self.GetActiveCamera()
@@ -310,7 +310,7 @@ class SceneManager(service.Service):
         elif self.primaryJob.sceneKey == sceneKey:
             self._ApplyCamera(self.primaryJob, camera)
             if self.secondaryJob is None:
-                uicore.uilib.SetSceneCamera(camera)
+                self.UpdateBracketProjectionCamera()
 
     @telemetry.ZONE_METHOD
     def SetSecondaryScene(self, scene, sceneKey, sceneType):
@@ -350,6 +350,7 @@ class SceneManager(service.Service):
         else:
             self.primaryJob.scene = scene
             self.primaryJob.renderJob.SetScene(scene)
+        self.UpdateBracketProjectionCamera()
 
     def RegisterJob(self, job):
         wr = blue.BluePythonWeakRef(job)
@@ -371,7 +372,7 @@ class SceneManager(service.Service):
         ret = self.GetActivePrimaryCamera()
         if ret is None:
             if IsNewCameraActive():
-                cameraID = evecamera.CAM_SHIPORBIT
+                cameraID = self._GetActivePrimarySpaceCam()
             else:
                 cameraID = evecamera.CAM_SPACE_PRIMARY
             ret = self._GetOrCreateCamera(cameraID)
@@ -391,7 +392,10 @@ class SceneManager(service.Service):
     def UnregisterCamera(self, key):
         if key in self.registeredCameras:
             self.LogNotice('sceneManager::UnregisterCamera', key, self.registeredCameras[key])
-            cam = self.registeredCameras[key]
+            if IsNewCameraActive() and key == evecamera.CAM_SPACE_PRIMARY:
+                cam = self.GetActiveSpaceCamera()
+            else:
+                cam = self.registeredCameras[key]
             if cam == self.GetActiveCamera():
                 sm.ScatterEvent('OnActiveCameraChanged', None)
             if hasattr(cam, 'OnDeactivated'):
@@ -433,6 +437,9 @@ class SceneManager(service.Service):
     def UnregisterScene(self, key):
         if key in self.registeredScenes:
             del self.registeredScenes[key]
+        if key == evecamera.CAM_SPACE_PRIMARY and IsNewCameraActive():
+            cam = self.GetActiveSpaceCamera()
+            cam.OnDeactivated()
 
     def RegisterScene(self, scene, key):
         self.registeredScenes[key] = scene
@@ -459,7 +466,8 @@ class SceneManager(service.Service):
         if self.primaryJob.sceneType != SCENE_TYPE_INTERIOR or key in self.overlaySceneKeys:
             scene = self.registeredScenes.get(key, None)
             if IsNewCameraActive() and key == evecamera.CAM_SPACE_PRIMARY:
-                camera = self.registeredCameras.get(evecamera.CAM_SHIPORBIT, None)
+                cameraID = self._GetActivePrimarySpaceCam()
+                camera = self.registeredCameras.get(cameraID, None)
             else:
                 camera = self.registeredCameras.get(key, None)
             self.SetActiveScene(scene, key)
@@ -523,16 +531,15 @@ class SceneManager(service.Service):
         if bool(solarSystemID) and bool(constellationID):
             starSeed = int(constellationID)
             securityStatus = sm.GetService('map').GetSecurityStatus(solarSystemID)
-        if not gfxutils.BlockStarfieldOnLionOSX():
-            scene.starfield = self._GetSharedResource('res:/dx9/scene/starfield/spritestars.red')
-            if scene.starfield is not None:
-                scene.starfield.seed = starSeed
-                scene.starfield.minDist = 40
-                scene.starfield.maxDist = 80
-                if util.IsWormholeSystem(solarSystemID):
-                    scene.starfield.numStars = 0
-                else:
-                    scene.starfield.numStars = 500 + int(250 * securityStatus)
+        scene.starfield = self._GetSharedResource('res:/dx9/scene/starfield/spritestars.red')
+        if scene.starfield is not None:
+            scene.starfield.seed = starSeed
+            scene.starfield.minDist = 40
+            scene.starfield.maxDist = 80
+            if util.IsWormholeSystem(solarSystemID):
+                scene.starfield.numStars = 0
+            else:
+                scene.starfield.numStars = 500 + int(250 * securityStatus)
 
     def _SetupUniverseStars(self, scene, solarsystemID):
         if gfxsettings.Get(gfxsettings.UI_EFFECTS_ENABLED) and solarsystemID is not None:
@@ -555,7 +562,6 @@ class SceneManager(service.Service):
         scene.sunDiffuseColor = (1.5, 1.5, 1.5, 1.0)
         self._SetupUniverseStars(scene, solarsystemID)
         self._PrepareBackgroundLandscapes(scene, solarsystemID)
-        scene.gpuParticlePoolManager = self.particlePoolManager
 
     def ApplySceneInflightAttributes(self, scene, camera, bp = None):
         if bp is None:
@@ -610,7 +616,7 @@ class SceneManager(service.Service):
                 return
             scene = sceneFromFile
             if IsNewCameraActive() and registerKey == evecamera.CAM_SPACE_PRIMARY:
-                cameraID = evecamera.CAM_SHIPORBIT
+                cameraID = self._GetActivePrimarySpaceCam()
             else:
                 cameraID = registerKey
             camera = self._GetOrCreateCamera(cameraID)
@@ -627,3 +633,10 @@ class SceneManager(service.Service):
                 self.sceneLoadedEvents.pop(registerKey).set()
 
         return (scene, camera)
+
+    def _GetActivePrimarySpaceCam(self):
+        return settings.char.ui.Get('spaceCameraID', evecamera.CAM_SHIPORBIT)
+
+    def ActivatePrimarySpaceCam(self):
+        cameraID = self._GetActivePrimarySpaceCam()
+        self.SetActiveCameraByID(cameraID)

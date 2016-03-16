@@ -171,7 +171,11 @@ class MapViewDirectionalScanHandler(object):
 
     def SetScanTarget(self, itemID, mapPosition, callback = None):
         conePosition = self.dScanTransform.worldTransform[3][:3]
-        scanVector = geo2.Vec3Normalize(geo2.Vec3Subtract(conePosition, mapPosition))
+        ball = sm.GetService('michelle').GetBall(itemID)
+        if not ball:
+            return
+        vec = ball.GetVectorAt(blue.os.GetSimTime())
+        scanVector = geo2.Vec3Normalize((-vec.x, -vec.y, -vec.z))
         oldScanVector = self.GetSpaceCameraViewVector()
         try:
             uicore.animations.StopAnimation(self.dScanTransform, 'rotation')

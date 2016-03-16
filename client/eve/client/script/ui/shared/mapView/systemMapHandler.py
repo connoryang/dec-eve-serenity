@@ -472,16 +472,15 @@ class OrbitCircle(object):
         lineSet.rotation = rotation
         parentTransform.children.append(lineSet)
         self.pixelLineSet = lineSet
-        mapViewUtil.DrawCircle(lineSet, (0, 0, 0), radius, startColor=(0.25, 0.25, 0.25, 1.0), endColor=(0.25, 0.25, 0.25, 1.0), lineWidth=2.5)
+        mapViewUtil.DrawCircle(lineSet, (0, 0, 0), radius, startColor=(1, 1, 1, 0.25), endColor=(1, 1, 1, 0.25), lineWidth=2.5)
         lineSet.SubmitChanges()
-        lineSet = mapViewUtil.CreatePlanarLineSet(texturePath='res:/dx9/texture/ui/linePlanarSmoothAdditive.dds')
+        lineSet = mapViewUtil.CreatePlanarLineSet()
         lineSet.scaling = (self.lineSetScaling, self.lineSetScaling, self.lineSetScaling)
         lineSet.translation = parentPosition
         lineSet.rotation = rotation
-        lineSet.additive = True
         parentTransform.children.append(lineSet)
         self.planarLineSet = lineSet
-        orbitLineColor = (0.2, 0.2, 0.2, 0.5)
+        orbitLineColor = (1, 1, 1, 0.25)
         self.planarLineIDs = mapViewUtil.DrawCircle(lineSet, (0, 0, 0), radius, startColor=orbitLineColor, endColor=orbitLineColor, lineWidth=radius / 150.0)
         lineSet.SubmitChanges()
 

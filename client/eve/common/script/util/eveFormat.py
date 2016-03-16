@@ -157,7 +157,7 @@ def FmtRef(entryTypeID, o1, o2, arg1, pretty = 1, amount = 0.0):
                     if arg1 > 0:
                         return localization.GetByLabel('UI/Generic/FormatReference/insurancePaidByCoveringLoss', itemname=evetypes.GetName(arg1), name1=GetName(o1), name2=GetName(o2))
                     elif arg1 and arg1 < 0:
-                        return localization.GetByLabel('UI/Generic/FormatReference/insurancePaidForShip', locaton=GetLocation(-arg1), name1=GetName(o1), name2=GetName(o2), refID=-arg1)
+                        return localization.GetByLabel('UI/Generic/FormatReference/insurancePaidForShip', location=GetLocation(-arg1), name1=GetName(o1), name2=GetName(o2), refID=-arg1)
                     else:
                         return localization.GetByLabel('UI/Generic/FormatReference/insurancePaidTo', name1=GetName(o1), name2=GetName(o2))
                 else:
@@ -338,6 +338,8 @@ def FmtRef(entryTypeID, o1, o2, arg1, pretty = 1, amount = 0.0):
                                 return localization.GetByLabel('UI/Generic/FormatReference/industryTeamEscrowReimbursement')
                             if entryTypeID == const.refIndustryFacilityTax:
                                 return localization.GetByLabel('UI/Generic/FormatReference/industryFacilityTaxRef', arg1=arg1, name1=GetName(o1), name2=GetName(o2))
+                            if entryTypeID == const.refOpportunityReward:
+                                return localization.GetByLabel('UI/Generic/FormatReference/opportunityRewardDescription')
                             if entryTypeID == const.refCloneTransport:
                                 return localization.GetByLabel('UI/Generic/FormatReference/cloneTransport', name1=GetName(o1), name2=GetName(o2))
                             if entryTypeID == const.refCloneTransportRefund:

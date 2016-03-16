@@ -225,14 +225,14 @@ class HangarView(StationView):
             self.lastShipzoomTo = zoomTo
             if not maintainZoomLevel:
                 self.Zoom(zoomTo)
-            if self.staticEnv:
-                self.RenderStaticEnvironment()
-            else:
-                self.RenderDynamicEnvironment()
         except Exception as e:
             log.LogException(str(e))
             sys.exc_clear()
         finally:
+            if self.staticEnv:
+                self.RenderStaticEnvironment()
+            else:
+                self.RenderDynamicEnvironment()
             delattr(self, '__alreadyShowingActiveShip')
 
     @telemetry.ZONE_METHOD

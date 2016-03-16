@@ -1,6 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\assetsWindow.py
 import dbutil
-from eveAssets.assetSearchUtil import SearchNamesHelper, AssetKeywordSearch, ParseString
+from eveAssets.assetSearchUtil import SearchNamesHelper, AssetKeywordSearch, IsPartOfText, ParseString
 import carbonui.const as uiconst
 from eve.client.script.ui.shared.inventory.invWindow import Inventory as InventoryWindow
 from eve.client.script.ui.util.uix import IsValidNamedItem
@@ -51,6 +51,7 @@ class AssetsWindow(uicontrols.Window):
         self.nameHelper = SearchNamesHelper(sm.GetService('ui'))
         self.assetKeywordSearch = AssetKeywordSearch(self.nameHelper, sm.GetService('ui'), sm.GetService('map'), sm.GetService('godma'), localization, cfg)
         self.searchKeywords = self.assetKeywordSearch.GetSearchKeywords()
+        self.searchText = None
         self.scrollPosition = defaultdict(float)
         self.Refresh()
 
@@ -69,6 +70,7 @@ class AssetsWindow(uicontrols.Window):
         except:
             self.scrollPosition[self.key] = 0.0
 
+        self._RecoverSearchText()
         uix.Flush(self.sr.main)
         self.sr.scroll = uicontrols.Scroll(parent=self.sr.main, padding=(const.defaultPadding,
          const.defaultPadding,
@@ -106,6 +108,11 @@ class AssetsWindow(uicontrols.Window):
              self,
              'station'])
         self.sr.maintabs = uicontrols.TabGroup(name='tabparent', parent=self.sr.main, idx=0, tabs=tabs, groupID='assetspanel', silently=True)
+
+    def _RecoverSearchText(self):
+        assetSearchBox = self.sr.searchtype
+        if assetSearchBox:
+            self.searchText = assetSearchBox.GetValue()
 
     def Load(self, key, reloadStationID = None):
         if self.loading:
@@ -195,15 +202,23 @@ class AssetsWindow(uicontrols.Window):
                 button = uicontrols.Button(parent=buttonCont, label=localization.GetByLabel('UI/Common/Buttons/Search'), left=sprite.left + sprite.width + const.defaultPadding, top=top, func=self.Search, align=uiconst.TOPRIGHT)
                 buttonCont.width = button.width + const.defaultPadding * 3 + sprite.width
                 self.sr.searchtype = assets.SearchBox(name='assetssearchtype', parent=self.sr.search_cont, left=const.defaultPadding, padBottom=1, width=0, top=top, label=localization.GetByLabel('UI/Common/SearchText'), maxLength=100, OnReturn=self.Search, align=uiconst.TOALL, keywords=self.searchKeywords, isTypeField=True)
+                self._RestoreSearchText()
                 self.search_inited = 1
             if self.sr.Get('filt_cont', None):
                 self.sr.filt_cont.state = uiconst.UI_HIDDEN
             self.sr.search_cont.state = uiconst.UI_PICKCHILDREN
             sortKeySearch = settings.char.ui.Get('assetsSearchSortKey', None)
             self.ShowSearch(sortKeySearch)
+            self.Search()
         self.loading = 0
         if self.pending:
             self.Load(*self.pending)
+
+    def _RestoreSearchText(self):
+        if self.searchText:
+            searchBox = self.sr.searchtype
+            if searchBox:
+                searchBox.SetValue(self.searchText)
 
     def Filter(self, *args):
         key, keyID = self.sr.filtcombo.GetValue()
@@ -215,7 +230,7 @@ class AssetsWindow(uicontrols.Window):
         for word, value in advancedMatches:
             try:
                 for kw in self.searchKeywords:
-                    if kw.keyword.lower().startswith(word):
+                    if IsPartOfText(kw.keyword, word):
                         kw.matchFunction(conditions, value)
                         break
 

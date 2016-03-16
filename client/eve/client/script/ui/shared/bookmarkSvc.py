@@ -155,6 +155,7 @@ class BookmarkSvc(Service):
             if message is not None:
                 uthread.new(eve.Message, *message)
             self.bookmarkCache.update(newBookmarks)
+        self.RefreshWindow()
 
     def UpdateBookmark(self, bookmarkID, ownerID, memo, note, folderID):
         bookmark = self.bookmarkCache[bookmarkID]

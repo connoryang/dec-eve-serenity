@@ -2,28 +2,30 @@
 from notifications.client.development.skillHistoryRow import SkillHistoryRow
 from notifications.common.notification import Notification
 import localization
-EVENT_TYPE_TO_ACTION = {34: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillClonePenalty'),
- 36: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingStarted'),
- 37: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
- 38: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingCanceled'),
- 39: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/GMGiveSkill'),
- 53: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
- 307: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillPointsApplied')}
+EVENT_TYPE_TO_ACTION = {const.skillEventClonePenalty: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillClonePenalty'),
+ const.skillEventTrainingStarted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingStarted'),
+ const.skillEventTrainingComplete: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
+ const.skillEventTrainingCancelled: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingCanceled'),
+ const.skillEventGMGive: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/GMGiveSkill'),
+ const.skillEventQueueTrainingCompleted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
+ const.skillEventFreeSkillPointsUsed: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillPointsApplied'),
+ const.skillEventSkillExtracted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillLevelExtracted')}
 
 class SkillHistoryProvider(object):
 
     def __init__(self, scatterDebug = False, onlyShowAfterDate = None):
+        self.skillSvc = sm.GetService('skills')
         self.scatterDebug = scatterDebug
         self.onlyShowAfterDate = onlyShowAfterDate
+        self.skillSvc.GetSkillHandler().CheckAndSendNotifications()
 
     def provide(self):
         notificationList = []
         result = []
-        skillRowSet = sm.GetService('skills').GetSkillHistory(10)
+        skillRowSet = self.skillSvc.GetSkillHistory(10)
         for row in skillRowSet:
-            skill = sm.GetService('skills').GetSkill(row.skillTypeID)
+            skill = self.skillSvc.GetSkill(row.skillTypeID)
             if skill is None:
-                print 'Skill not found curious TODO < change to log'
                 continue
             objectRow = SkillHistoryRow(row, skill.skillRank, cfg, EVENT_TYPE_TO_ACTION)
             if self.onlyShowAfterDate and objectRow.logDate <= self.onlyShowAfterDate:

@@ -68,6 +68,7 @@ class ActiveItem(uicontrols.Window):
          'UI/Inflight/Submenus/KeepAtRange',
          ('UI/Inflight/LockTarget', 'UI/Inflight/UnlockTarget'),
          ('UI/Inflight/LookAtObject', 'UI/Inflight/ResetCamera'),
+         'UI/Inflight/SetAsCameraInterest',
          'UI/Commands/ShowInfo']
         self.groups = {const.groupStation: ['UI/Inflight/DockInStation'],
          const.groupWreck: ['UI/Commands/OpenCargo'],
@@ -155,6 +156,7 @@ class ActiveItem(uicontrols.Window):
          'UI/Inflight/UnlockTarget': ('res:/UI/Texture/icons/44_32_17.png', 0, 0, 0, 1, 'selectedItemUnLockTarget', 'CmdUnlockTargetItem'),
          'UI/Inflight/LookAtObject': ('res:/UI/Texture/icons/44_32_20.png', 0, 0, 0, 0, 'selectedItemLookAt', 'CmdToggleLookAtItem'),
          'UI/Inflight/ResetCamera': ('res:/UI/Texture/icons/44_32_20.png', 0, 0, 0, 1, 'selectedItemResetCamera', None),
+         'UI/Inflight/SetAsCameraInterest': ('res:/UI/Texture/icons/44_32_65.png', 0, 0, 0, 0, 'selectedItemSetInterest', 'CmdToggleCameraTracking'),
          'UI/Chat/StartConversation': ('res:/UI/Texture/icons/44_32_33.png', 0, 0, 0, 0, 'selectedItemStartConversation', None),
          'UI/Commands/OpenCargo': ('res:/UI/Texture/icons/44_32_35.png', 0, 0, 0, 0, 'selectedItemOpenCargo', None),
          'UI/PI/Common/AccessCustomOffice': ('res:/UI/Texture/icons/44_32_35.png', 0, 0, 0, 0, 'selectedItemOpenCargo', None),

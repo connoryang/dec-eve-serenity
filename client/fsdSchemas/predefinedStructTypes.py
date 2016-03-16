@@ -1,5 +1,6 @@
-#Embedded file name: F:\depot\streams\olafurth_olafurth-pc_STABLE_2754\fsdSchemas\predefinedStructTypes.py
+#Embedded file name: C:\jamieb_jamieb-pc_STABLE_1796\fsdSchemas\predefinedStructTypes.py
 import struct
+uint64 = struct.Struct('Q')
 uint32 = struct.Struct('I')
 int32 = struct.Struct('i')
 keyedOffsetData = struct.Struct('ii')

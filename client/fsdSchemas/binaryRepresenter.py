@@ -1,4 +1,4 @@
-#Embedded file name: F:\depot\streams\olafurth_olafurth-pc_STABLE_2754\fsdSchemas\binaryRepresenter.py
+#Embedded file name: C:\jamieb_jamieb-pc_STABLE_1796\fsdSchemas\binaryRepresenter.py
 import ctypes
 import cStringIO
 import schemaOptimizer
@@ -7,6 +7,7 @@ import validator
 import struct
 import cPickle
 from nestedIndexedOffsetData import IndexedOffsetData
+uint64 = struct.Struct('Q')
 uint32 = struct.Struct('I')
 int32 = struct.Struct('i')
 vector2_float = struct.Struct('ff')
@@ -248,9 +249,9 @@ def ObjectAsBinaryStringWithIndexedOffsetData(o, schema, path):
             indexedOffsetData.AddOffset(offsets[i] + representation.tell())
             indexedOffsetDataForObjectAttributes.AddNestedIndexedOffsetData(indexedOffsetData)
 
-    offsetToListData = len(uint32.pack(optionalAttributesField)) + len(ctypes.string_at(ctypes.addressof(offsets), ctypes.sizeof(offsets)))
+    offsetToListData = len(uint64.pack(optionalAttributesField)) + len(ctypes.string_at(ctypes.addressof(offsets), ctypes.sizeof(offsets)))
     indexedOffsetDataForObjectAttributes.AddOffset(offsetToListData)
-    representation.write(uint32.pack(optionalAttributesField))
+    representation.write(uint64.pack(optionalAttributesField))
     representation.write(ctypes.string_at(ctypes.addressof(offsets), ctypes.sizeof(offsets)))
     representation.write(attributesWithOffsets.getvalue())
     return (representation.getvalue(), indexedOffsetDataForObjectAttributes)

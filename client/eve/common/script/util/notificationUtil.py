@@ -68,15 +68,11 @@ def CreateLocationInfoLink(locationID, locationTypeID = None):
             locationTypeID = stationinfo.stationTypeID
     if locationTypeID is None:
         return locationName
-    else:
-        return '<a href="showinfo:%(typeID)s//%(locationID)s">%(locationName)s</a>' % {'typeID': locationTypeID,
-         'locationID': locationID,
-         'locationName': locationName}
+    return localization.GetByLabel('UI/Contracts/ContractsWindow/ShowInfoLink', showInfoName=locationName, info=('showinfo', locationTypeID, locationID))
 
 
 def CreateTypeInfoLink(typeID):
-    return '<a href="showinfo:%(typeID)s">%(typeName)s</a>' % {'typeID': typeID,
-     'typeName': evetypes.GetName(typeID)}
+    return localization.GetByLabel('UI/Contracts/ContractsWindow/ShowInfoLink', showInfoName=evetypes.GetName(typeID), info=('showinfo', typeID))
 
 
 def GetAgent(agentID):

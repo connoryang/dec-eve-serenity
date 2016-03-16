@@ -314,8 +314,8 @@ class AchievementTreeSlot(Container):
     def UpdateGroupState(self):
         activeGroupID = sm.GetService('achievementSvc').GetActiveAchievementGroupID()
         groupData = GetAchievementGroup(self.achievementGroupID)
-        totalNum = len(groupData.GetAchievementTasks())
-        completed = len([ x for x in groupData.GetAchievementTasks() if x.completed ])
+        totalNum = groupData.GetNumberOfTasks()
+        completed = groupData.GetNumberOfCompleted()
         if totalNum == completed:
             self.stateSprite.SetTexturePath('res:/UI/Texture/classes/Achievements/iconComplete.png')
             self.progressState = STATE_COMPLETED
@@ -334,7 +334,7 @@ class AchievementTreeSlot(Container):
                 self.stateSprite.SetTexturePath('res:/UI/Texture/classes/Achievements/iconIncomplete.png')
             self.progressState = STATE_INCOMPLETE
             self.backgroundSprite.texturePath = 'res:/UI/Texture/classes/Achievements/hexBackIncomplete.png'
-        self.nameLabel.text = groupData.groupName
+        self.nameLabel.text = GetByLabel(groupData.groupName)
         if activeGroupID == self.achievementGroupID:
             self.activeEffectSprite.display = True
             self.activeStateSprite.display = True
@@ -437,7 +437,7 @@ class AchievementTreeSlot(Container):
             ax_cu_rounded = hex_round(*ax_cu)
             cu_ax = cube_to_odd_q_axial_coordinate(*ax_cu_rounded)
             groupData = GetAchievementGroup(each.achievementGroupID)
-            print 'group%s.SetTreePosition(%s) # %s' % (each.achievementGroupID, cu_ax, groupData.groupName)
+            print 'group%s.SetTreePosition(%s) # %s' % (each.achievementGroupID, cu_ax, GetByLabel(groupData.groupName))
 
     def OnMouseEnter(self, *args):
         activeGroupID = sm.GetService('achievementSvc').GetActiveAchievementGroupID()

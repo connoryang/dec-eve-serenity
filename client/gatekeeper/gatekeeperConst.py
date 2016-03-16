@@ -18,3 +18,5 @@ cohortTEXStartingSkills = 15
 cohortTEXStartingSkillsControl = 16
 cohortTEXShorterCharacterCreation = 17
 cohortTEXShorterCharacterCreationControl = 18
+cohortTEXOpportunityRewards = 19
+cohortTEXOpportunityRewardsControl = 20

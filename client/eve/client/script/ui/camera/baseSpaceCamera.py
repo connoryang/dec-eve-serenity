@@ -2,14 +2,13 @@
 import math
 import audio2
 from eve.client.script.ui.camera.baseCamera import Camera
-from eve.client.script.ui.camera.cameraUtil import IsBobbingEnabled, GetCameraMaxLookAtRange
+from eve.client.script.ui.camera.cameraUtil import IsBobbingEnabled, GetCameraMaxLookAtRange, GetBallPosition, GetBall
 import evecamera
 from evecamera.animation import AnimationController
 from evecamera.shaker import ShakeController
 import blue
 import random
 import geo2
-import trinity
 from evecamera.utils import CreateBehaviorFromMagnitudeAndPosition, PanCameraAccelerated
 import evegraphics.settings as gfxsettings
 import uthread
@@ -18,7 +17,7 @@ BOBBING_SPEED = 0.5
 
 class BaseSpaceCamera(Camera):
     isBobbingCamera = False
-    __notifyevents__ = Camera.__notifyevents__ + ['OnSpecialFX']
+    __notifyevents__ = Camera.__notifyevents__[:] + ['OnSpecialFX']
 
     def __init__(self):
         Camera.__init__(self)
@@ -66,6 +65,8 @@ class BaseSpaceCamera(Camera):
     def _UpdateCameraNoiseOffset(self):
         if self.noiseScaleCurve:
             self.noiseScale = self.noiseScaleCurve.UpdateScalar(blue.os.GetSimTime())
+        if self.noiseScale == 0:
+            return
         if self.noiseDampCurve:
             self.noiseDamp = self.noiseDampCurve.UpdateScalar(blue.os.GetSimTime())
         dT = 1.0 / blue.os.fps
@@ -88,7 +89,7 @@ class BaseSpaceCamera(Camera):
         self.LookAt(self.ego)
         self.ResetAnchorPos()
 
-    def SetCameraInterest(self, itemID):
+    def Track(self, itemID):
         self.LookAt(itemID)
 
     def GetCameraParent(self):
@@ -116,27 +117,11 @@ class BaseSpaceCamera(Camera):
         if self.IsManualControlEnabled():
             Camera.Orbit(self, *args)
 
-    def GetBall(self, itemID):
-        bp = sm.GetService('michelle').GetBallpark()
-        if not bp:
-            return None
-        return bp.GetBall(itemID)
-
-    def GetBallPosition(self, ball):
-        if hasattr(ball, 'model') and not isinstance(ball.model, trinity.EvePlanet):
-            elpc = trinity.EveLocalPositionCurve()
-            elpc.parent = ball.model
-            elpc.behavior = trinity.EveLocalPositionBehavior.centerBounds
-            vec = elpc.GetVectorAt(blue.os.GetSimTime())
-        else:
-            vec = ball.GetVectorAt(blue.os.GetSimTime())
-        return (vec.x, vec.y, vec.z)
-
     def GetTrackPosition(self, ball):
         if not ball:
             ret = (0, 0, 0)
         else:
-            ret = self.GetBallPosition(ball)
+            ret = GetBallPosition(ball)
         if self._eyeAndAtOffset:
             ret = geo2.Vec3Subtract(ret, self._eyeAndAtOffset)
         return ret
@@ -156,10 +141,10 @@ class BaseSpaceCamera(Camera):
         self._AddToAtOffset(bobbingOffset)
 
     def CheckObjectTooFar(self, itemID):
-        ball = self.GetBall(itemID)
+        ball = GetBall(itemID)
         if not ball:
             return False
-        ballPos = self.GetBallPosition(ball)
+        ballPos = GetBallPosition(ball)
         isTooFar = geo2.Vec3Length(ballPos) > GetCameraMaxLookAtRange()
         return isTooFar
 
@@ -175,16 +160,19 @@ class BaseSpaceCamera(Camera):
 
     def UpdateAnchorOffset(self):
         if self._anchorBall:
-            offset = self.GetBallPosition(self._anchorBall)
+            offset = GetBallPosition(self._anchorBall)
             self._AddToEyeAndAtOffset(offset)
 
     def OnSpecialFX(self, shipID, moduleID, moduleTypeID, targetID, otherTypeID, guid, isOffensive, start, active, duration = -1, repeat = None, startTime = None, timeFromStart = 0, graphicInfo = None):
         if guid == 'effects.Warping':
-            if shipID in (self.ego, self.LookingAt()):
+            if shipID in (self.ego, self.GetLookAtItemID()):
                 self.OnCurrentShipWarping()
 
-    def LookingAt(self):
-        return None
+    def GetLookAtItemID(self):
+        return self.ego
+
+    def GetItemID(self):
+        return self.GetLookAtItemID()
 
     def OnCurrentShipWarping(self):
         pass
@@ -203,3 +191,6 @@ class BaseSpaceCamera(Camera):
 
     def TranslateFromParentAccelerated(self, begin, end, durationSec, accelerationPower = 2.0):
         self.animationController.Schedule(PanCameraAccelerated(begin, end, durationSec, accelerationPower))
+
+    def IsLocked(self):
+        return False

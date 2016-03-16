@@ -9,8 +9,6 @@ import util
 from dogma.const import attributeAsteroidRadiusUnitSize, attributeAsteroidRadiusGrowthFactor
 from eve.common.lib.appConst import maxAsteroidRadius
 import localization
-import log
-import geo2
 ASTEROID_EXP_SCALE = 4e-05
 
 def CombatLog_CopyText(mail, *args):
@@ -369,16 +367,6 @@ def AUPerSecondToDestinyWarpSpeed(auPerSecond):
 
 def IsDustEnabled():
     return boot.region != 'optic'
-
-
-def GetStationUndockVectors(stationID, typeID = None):
-    station = cfg.mapSolarSystemContentCache.npcStations.GetIfExists(stationID)
-    typeID = getattr(station, 'typeID', typeID)
-    locations = cfg.graphicLocations.GetIfExists(typeID)
-    if locations is None:
-        log.LogError("GetStationUndockVectors: Can't find locations with id %s and typeID %s" % (stationID, typeID))
-        return (geo2.Vector(0.0, 0.0, 0.0), geo2.Vector(0.0, 0.0, 1.0))
-    return (locations.undockPoint.position, locations.undockPoint.direction)
 
 
 exports = {'util.CombatLog_CopyText': CombatLog_CopyText,

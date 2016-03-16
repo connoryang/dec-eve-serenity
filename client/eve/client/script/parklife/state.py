@@ -203,7 +203,14 @@ class StateSvc(service.Service):
          'ewGuidanceDisrupt': (state.flagGuidanceDisrupted, const.iconModuleGuidanceDisruptor),
          'ewTargetPaint': (state.flagTargetPainted, const.iconModuleTargetPainter),
          'ewEnergyVampire': (state.flagEnergyLeeched, const.iconModuleNosferatu),
-         'ewEnergyNeut': (state.flagEnergyNeut, const.iconModuleEnergyNeutralizer)}
+         'ewEnergyNeut': (state.flagEnergyNeut, const.iconModuleEnergyNeutralizer),
+         'remoteTracking': (state.flagRemoteTracking, const.iconModuleRemoteTracking),
+         'energyTransfer': (state.flagEnergyTransfer, const.iconModuleEnergyTransfer),
+         'sensorBooster': (state.flagSensorBooster, const.iconModuleSensorBooster),
+         'eccmProjector': (state.flagECCMProjector, const.iconModuleECCMProjector),
+         'remoteHullRepair': (state.flagRemoteHullRepair, const.iconModuleHullRepairer),
+         'remoteArmorRepair': (state.flagRemoteArmorRepair, const.iconModuleArmorRepairer),
+         'shieldTransfer': (state.flagShieldTransfer, const.iconModuleShieldBooster)}
         self.ewarStateItems = self.ewarStates.items()
         self.shouldLogError = True
         self.InitFilter()
@@ -284,7 +291,14 @@ class StateSvc(service.Service):
              state.flagGuidanceDisrupted: StateProperty(GetByLabel('UI/Services/State/InflightState/GuidanceDisrupting'), '', '', GetByLabel('UI/Services/State/InflightState/GuidanceDisruptingHint'), 0, None, None),
              state.flagTargetPainted: StateProperty(GetByLabel('UI/Services/State/InflightState/Painting'), '', '', GetByLabel('UI/Services/State/InflightState/PaintingHint'), 0, None, None),
              state.flagEnergyLeeched: StateProperty(GetByLabel('UI/Services/State/InflightState/EnergyLeeched'), '', '', GetByLabel('UI/Services/State/InflightState/EnergyLeechedHint'), 0, None, None),
-             state.flagEnergyNeut: StateProperty(GetByLabel('UI/Services/State/InflightState/EnergyNeutralizing'), '', '', GetByLabel('UI/Services/State/InflightState/EnergyNeutralizingHint'), 0, None, None)}
+             state.flagEnergyNeut: StateProperty(GetByLabel('UI/Services/State/InflightState/EnergyNeutralizing'), '', '', GetByLabel('UI/Services/State/InflightState/EnergyNeutralizingHint'), 0, None, None),
+             state.flagRemoteTracking: StateProperty(GetByLabel('UI/Services/State/InflightState/RemoteTracking'), '', '', GetByLabel('UI/Services/State/InflightState/RemoteTrackingHint'), 0, None, None),
+             state.flagEnergyTransfer: StateProperty(GetByLabel('UI/Services/State/InflightState/EnergyTransfer'), '', '', GetByLabel('UI/Services/State/InflightState/EnergyTransferHint'), 0, None, None),
+             state.flagSensorBooster: StateProperty(GetByLabel('UI/Services/State/InflightState/SensorBooster'), '', '', GetByLabel('UI/Services/State/InflightState/SensorBoosterHint'), 0, None, None),
+             state.flagECCMProjector: StateProperty(GetByLabel('UI/Services/State/InflightState/ECCMProjector'), '', '', GetByLabel('UI/Services/State/InflightState/ECCMProjectorHint'), 0, None, None),
+             state.flagRemoteHullRepair: StateProperty(GetByLabel('UI/Services/State/InflightState/RemoteHullRepair'), '', '', GetByLabel('UI/Services/State/InflightState/RemoteHullRepairHint'), 0, None, None),
+             state.flagRemoteArmorRepair: StateProperty(GetByLabel('UI/Services/State/InflightState/RemoteArmorRepair'), '', '', GetByLabel('UI/Services/State/InflightState/RemoteArmorRepairHint'), 0, None, None),
+             state.flagShieldTransfer: StateProperty(GetByLabel('UI/Services/State/InflightState/ShieldTransfer'), '', '', GetByLabel('UI/Services/State/InflightState/ShieldTransferHint'), 0, None, None)}
         return self.smartFilterProps
 
     @telemetry.ZONE_METHOD
@@ -454,7 +468,10 @@ class StateSvc(service.Service):
         self.NotifyOnStateSetupChange('stateColor')
 
     def InitFilter(self):
-        self.filterCategs = {const.categoryShip, const.categoryEntity, const.categoryDrone}
+        self.filterCategs = {const.categoryShip,
+         const.categoryEntity,
+         const.categoryDrone,
+         const.categoryFighter}
         self.updateCategs = self.filterCategs.copy()
         self.filterGroups = {const.groupCargoContainer,
          const.groupSecureCargoContainer,
@@ -627,6 +644,12 @@ class StateSvc(service.Service):
 
         return ret
 
+    def GetState(self, itemID, flag):
+        if flag not in self.states:
+            return False
+        else:
+            return itemID in self.states[flag]
+
     @telemetry.ZONE_METHOD
     def GetExclState(self, flag):
         return self.exclusives.get(flag, None)
@@ -660,6 +683,14 @@ class StateSvc(service.Service):
             del self.states[flag]
         self.LogInfo('Before OnStateChange', itemID, flag, state, *args)
         sm.ScatterEvent('OnStateChange', itemID, flag, state, *args)
+
+    def ResetByFlag(self, flag):
+        if flag not in self.states:
+            return
+        for itemID in self.states[flag].keys():
+            sm.ScatterEvent('OnStateChange', itemID, flag, False)
+
+        del self.states[flag]
 
     def DoBallClear(self, *etc):
         self.states = {}
@@ -1003,6 +1034,9 @@ class StateSvc(service.Service):
         if charID is not None:
             return sm.GetService('crimewatchSvc').HasLimitedEngagmentWith(charID)
         return False
+
+    def CheckMultiSelected(self, slimItem):
+        return slimItem.itemID in self.states[state.multiSelected]
 
 
 def GetNPCGroups():

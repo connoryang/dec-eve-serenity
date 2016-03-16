@@ -46,7 +46,8 @@ customSoundLevelsSettings = {'custom_master': 'custom_master',
  'custom_atmosphere': 'custom_atmosphere',
  'custom_dungeonmusic': 'custom_dungeonmusic',
  'custom_normalmusic': 'custom_normalmusic',
- 'custom_warpeffect': 'custom_warpeffect'}
+ 'custom_warpeffect': 'custom_warpeffect',
+ 'custom_cap': 'custom_cap'}
 dampeningSettings = {'inactiveSounds_master': 'custom_damp_master',
  'inactiveSounds_music': 'custom_damp_music',
  'inactiveSounds_turrets': 'custom_damp_turrets',
@@ -173,9 +174,11 @@ class AudioService(service.Service, GameworldAudioMixin):
         self.active = False
         sm.ScatterEvent('OnAudioDeactivated')
 
-    def GetAudioBus(self, is3D = False):
+    def GetAudioBus(self, is3D = False, rate = 44100):
+        isLowRate = rate == 44100
         for outputChannel, emitterWeakRef in self.busChannels.iteritems():
-            if emitterWeakRef is None:
+            channelLowRate = outputChannel >= 4
+            if isLowRate == channelLowRate and emitterWeakRef is None:
                 emitter = audio2.AudEmitter('Bus Channel: ' + str(outputChannel))
                 if is3D:
                     emitter.SendEvent(unicode('Play_3d_audio_stream_' + str(outputChannel)))
@@ -476,6 +479,14 @@ class AudioService(service.Service, GameworldAudioMixin):
         if sm.IsServiceRunning('dynamicMusic'):
             sm.GetService('dynamicMusic').UpdateDynamicMusic()
 
+    def GetCombatMusicUsage(self):
+        return self.AppGetSetting('useCombatMusic', 1)
+
+    def SetCombatMusicUsage(self, useCombatMusic):
+        self.AppSetSetting('useCombatMusic', useCombatMusic)
+        if sm.IsServiceRunning('dynamicMusic'):
+            sm.GetService('dynamicMusic').UpdateDynamicMusic()
+
     def MuteSounds(self):
         self.SetMasterVolume(0.0, False)
 
@@ -561,9 +572,10 @@ class AudioService(service.Service, GameworldAudioMixin):
         elif cameraID == evecamera.CAM_SHIPPOV:
             if hasattr(session, 'shipid') and session.shipid is not None:
                 ship = sm.GetService('michelle').GetItem(session.shipid)
-                sizeStr = GetBoosterSizeStr(ship.grouID)
-                eventStr = 'ship_interior_%s_play' % sizeStr
-                self.SendUIEvent(eventStr)
-                self.SendUIEvent('state_camera_set_cockpit')
+                if ship:
+                    sizeStr = GetBoosterSizeStr(ship.groupID)
+                    eventStr = 'ship_interior_%s_play' % sizeStr
+                    self.SendUIEvent(eventStr)
+                    self.SendUIEvent('state_camera_set_cockpit')
         else:
             self.SendUIEvent('state_camera_set_normal')

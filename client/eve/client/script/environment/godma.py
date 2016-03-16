@@ -2,6 +2,7 @@
 from carbon.common.script.sys.row import Row
 from eve.common.script.sys.rowset import FilterRowset, IndexRowset, IndexedRowLists, IndexedRows
 from eve.client.script.util import godmarowset
+from gametime import GetDurationInClient
 import cPickle
 import math
 from inventorycommon.util import GetItemVolume, IsShipFittingFlag
@@ -10,7 +11,6 @@ import service
 import blue
 import util
 import dbutil
-import characterskills.util
 import uthread
 import moniker
 import random
@@ -140,11 +140,10 @@ class Godma(service.Service):
          targetBallID,
          jammingType)
         self.activeJams.add(jamTuple)
-        uthread.new(self.StopJam, startTime + duration * const.MSEC, jamTuple)
-        sm.ScatterEvent('OnEwarStart', sourceBallID, moduleID, targetBallID, jammingType)
+        uthread.new(self.StopJam, GetDurationInClient(startTime, duration), jamTuple)
 
-    def StopJam(self, stopTime, jamTuple):
-        blue.pyos.synchro.SleepSim((stopTime - blue.os.GetSimTime()) / const.MSEC)
+    def StopJam(self, duration, jamTuple):
+        blue.pyos.synchro.SleepSim(duration)
         if jamTuple in self.activeJams:
             self.activeJams.remove(jamTuple)
             sm.ScatterEvent('OnJamEnd', *jamTuple)
@@ -157,8 +156,6 @@ class Godma(service.Service):
              jammingType))
         except KeyError:
             pass
-        finally:
-            sm.ScatterEvent('OnEwarEnd', sourceBallID, moduleID, targetBallID, jammingType)
 
     def OnMultiEvent(self, events):
         dmg = []
@@ -1295,10 +1292,11 @@ class StateManager():
          const.categoryModule,
          const.categoryCharge,
          const.categoryDrone,
-         const.categorySubSystem) and itemGroupID != const.groupCharacter:
+         const.categorySubSystem,
+         const.categoryFighter) and itemGroupID != const.groupCharacter:
             self.godma.LogError('Godma location received unexpected and unwanted item', item)
             return
-        if itemFlag in (const.flagCargo, const.flagDroneBay):
+        if itemFlag in (const.flagCargo, const.flagDroneBay) or itemFlag in const.fighterTubeFlags:
             return
         doUpdate = False
         ret = None

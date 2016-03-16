@@ -540,8 +540,7 @@ class BookmarkFolderEntry(ListGroup):
 
     def Startup(self, *etc):
         ListGroup.Startup(self, *etc)
-        self.sensorSuite = sm.GetService('sensorSuite')
-        self.overlayButton = ButtonIcon(name='overlayButton', parent=self.sr.labelClipper, align=uiconst.CENTERLEFT, width=14, height=14, iconSize=16, left=200, texturePath='res://UI/Texture/classes/SensorSuite/sensor_overlay_small.png', func=self.OnChangeSensorOverlayVisibility, colorSelected=COLOR_SELECTED)
+        self.overlayButton = ButtonIcon(name='overlayButton', parent=self.sr.labelClipper, align=uiconst.CENTERLEFT, width=14, height=14, iconSize=16, left=200, texturePath='res://UI/Texture/classes/SensorSuite/sensor_overlay_small.png', func=self.OnChangeSensorOverlayVisibility, colorSelected=COLOR_SELECTED, isSelectedBgUsed=False)
 
     def Load(self, node):
         ListGroup.Load(self, node)
@@ -552,7 +551,7 @@ class BookmarkFolderEntry(ListGroup):
     def OnChangeSensorOverlayVisibility(self):
         isVisible = not bookmarkVisibilityManager.IsFolderVisible(self.folderID)
         bookmarkVisibilityManager.SetFolderVisibility(self.folderID, isVisible)
-        self.sensorSuite.UpdateVisibleSites()
+        sm.ScatterEvent('OnRefreshBookmarks')
         self.SetIsVisible(isVisible)
 
     def SetIsVisible(self, isVisible):

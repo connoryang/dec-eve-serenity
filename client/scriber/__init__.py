@@ -74,6 +74,11 @@ def scribe(template, *args, **kwargs):
         log.error('Templates: %s' % get_environment().list_templates())
 
 
+def scribe_str(template_str, *args, **kwargs):
+    template = get_environment().from_string(template_str)
+    return template.render(*args, **kwargs)
+
+
 def template_exists(template):
     if template.startswith('/'):
         template = template[1:]

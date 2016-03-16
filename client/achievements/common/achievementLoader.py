@@ -1,6 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\achievements\common\achievementLoader.py
-__author__ = 'aevar'
-from ..common.achievementController import Achievement
+from achievements.common.achievement import Achievement
 from ..common.achievementController import AchievementSimpleCondition
 import localization
 

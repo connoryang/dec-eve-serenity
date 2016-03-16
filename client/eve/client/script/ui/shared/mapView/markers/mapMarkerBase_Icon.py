@@ -29,6 +29,7 @@ class MarkerIconBase(MarkerSolarSystemBased):
     distanceSortEnabled = True
     inRangeIndicator = None
     distanceFadeAlphaNearFar = (0.0, mapViewConst.MAX_MARKER_DISTANCE)
+    trackingTransforms = None
 
     def __init__(self, *args, **kwds):
         MarkerSolarSystemBased.__init__(self, *args, **kwds)
@@ -71,12 +72,23 @@ class MarkerIconBase(MarkerSolarSystemBased):
             ball = ballpark.AddClientSideBall(MapPosToSolarSystemPos(self.mapPositionLocal), isGlobal=True)
             self.clientBall = ball
 
+    def RegisterTrackingTransform(self, transform):
+        if self.trackingTransforms is None:
+            self.trackingTransforms = []
+        if transform not in self.trackingTransforms:
+            self.trackingTransforms.append(transform)
+
+    def UnregisterTrackingTransform(self, transform):
+        if transform in self.trackingTransforms:
+            self.trackingTransforms.remove(transform)
+
     def Close(self, *args):
         MarkerSolarSystemBased.Close(self, *args)
         ballpark = sm.GetService('michelle').GetBallpark()
         if ballpark and self.clientBall and self.clientBall.id in ballpark.balls:
             ballpark.RemoveClientSideBall(self.clientBall.id)
         self.clientBall = None
+        self.trackingTransforms = None
 
     def SetInRangeIndicatorState(self, visibleState):
         self.inRangeIndicatorState = visibleState
@@ -94,11 +106,17 @@ class MarkerIconBase(MarkerSolarSystemBased):
         self.mapPositionSolarSystem = solarSystemPosition
         self.position = geo2.Vec3Add(solarSystemPosition, self.mapPositionLocal)
         self.projectBracket.trackPosition = self.position
+        if self.trackingTransforms:
+            for each in self.trackingTransforms:
+                each.translation = self.position
 
     def UpdateMapPositionLocal(self, mapPositionLocal):
         self.mapPositionLocal = mapPositionLocal
         self.position = geo2.Vec3Add(self.mapPositionSolarSystem, mapPositionLocal)
         self.projectBracket.trackPosition = self.position
+        if self.trackingTransforms:
+            for each in self.trackingTransforms:
+                each.translation = self.position
 
     def HighlightLoad(self):
         fill = Sprite(parent=self.markerContainer, color=(1, 1, 1, 0), align=uiconst.CENTER, pos=(0, 0, 2, 2), texturePath='res:/UI/Texture/classes/MapView/markerFadeIn.png')

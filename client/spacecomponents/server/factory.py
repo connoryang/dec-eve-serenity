@@ -4,6 +4,7 @@ from entosis.spacecomponents.server.entosisLootTarget import EntosisLootTarget
 from entosis.spacecomponents.server.disruptableStationService import DisruptableStationService
 from entosis.spacecomponents.server.entosisCommandNode import EntosisCommandNode
 from entosis.spacecomponents.server.entosisSovereigntyStructure import EntosisSovereigntyStructure
+from eve.server.script.mgt.fighters.fighterSquadronComponent import FighterSquadron
 from spacecomponents.common.components import bookmark
 from spacecomponents.common import componentConst
 from spacecomponents.common.components.component import Component
@@ -58,7 +59,8 @@ COMPONENTS = {componentConst.DEPLOY_CLASS: deploy.Deploy,
  componentConst.ENTOSIS_SOVEREIGNTY_STRUCTURE: EntosisSovereigntyStructure,
  componentConst.CONQUERABLE_STATION: ConquerableStation,
  componentConst.NPC_WARP_BEACON: Component,
- componentConst.ITEM_TRADER: itemtrader.ItemTrader}
+ componentConst.ITEM_TRADER: itemtrader.ItemTrader,
+ componentConst.FIGHTER_SQUADRON_CLASS: FighterSquadron}
 
 def GetComponentClass(componentName):
     return COMPONENTS[componentName]

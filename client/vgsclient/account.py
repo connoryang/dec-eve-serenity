@@ -1,6 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\vgsclient\account.py
 import logging
-from threadutils import Signal
+import signals
 log = logging.getLogger(__name__)
 
 class Account:
@@ -9,8 +9,8 @@ class Account:
         self.vgsCrestConnection = vgsCrestConnection
         self.aurumBalance = None
         self.transactionHref = None
-        self.accountAurumBalanceChanged = Signal()
-        self.redeemingTokensUpdated = Signal()
+        self.accountAurumBalanceChanged = signals.Signal()
+        self.redeemingTokensUpdated = signals.Signal()
 
     def ClearCache(self):
         self.aurumBalance = None
@@ -31,10 +31,10 @@ class Account:
     def OnAurumChangeFromVgs(self, newBalance):
         log.debug('OnAurumChangeFromVgs %s' % newBalance)
         self.aurumBalance = newBalance
-        self.accountAurumBalanceChanged.emit(self.aurumBalance)
+        self.accountAurumBalanceChanged(self.aurumBalance)
 
     def OnRedeemingTokensUpdated(self):
-        self.redeemingTokensUpdated.emit()
+        self.redeemingTokensUpdated()
 
     def GetAurumBalance(self):
         if self.aurumBalance is None:

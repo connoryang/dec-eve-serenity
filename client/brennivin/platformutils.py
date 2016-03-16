@@ -28,10 +28,15 @@ def get_interpreter_flavor(_exepath = _ignore, _vinfo = _ignore):
             if _vinfo[1] == 7:
                 return EXE_MAYA27
         if path.endswith(('python.exe', 'pythonw.exe', 'python')):
-            if _vinfo[1] == 6:
-                return EXE_VANILLA26
-            if _vinfo[1] == 7:
-                return EXE_VANILLA27
+            try:
+                import stackless
+                return EXE_EXEFILE
+            except ImportError:
+                if _vinfo[1] == 6:
+                    return EXE_VANILLA26
+                if _vinfo[1] == 7:
+                    return EXE_VANILLA27
+
         raise NameError("Could not identify executable path '%s'" % path)
 
     return getType(_exepath)

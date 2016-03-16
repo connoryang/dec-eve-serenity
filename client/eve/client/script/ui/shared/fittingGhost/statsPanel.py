@@ -248,7 +248,7 @@ class StatsPanelGhost(Container):
     def MaxTargetRangeBonusMultiplier(self, typeID):
         typeeffects = cfg.dgmtypeeffects.get(typeID, [])
         for effect in typeeffects:
-            if effect.effectID in (dogmaConst.effectShipMaxTargetRangeBonusOnline, dogmaConst.effectmaxTargetRangeBonus):
+            if effect.effectID in (dogmaConst.effectShipMaxTargetRangeBonusOnline, dogmaConst.effectMaxTargetRangeBonus):
                 return 1
 
     def ArmorOrShieldMultiplier(self, typeID):

@@ -1,4 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\inventory\invContainers.py
+from eve.client.script.ui.inflight.squadrons.fighterInvCont import FighterInvCont
 import uiprimitives
 import uicontrols
 import carbonui.const as uiconst
@@ -140,6 +141,11 @@ class ShipMaintenanceBay(_BaseCelestialContainer):
 class ShipDroneBay(invCont._InvContBase):
     __guid__ = 'invCont.ShipDroneBay'
     __invControllerClass__ = invCtrl.ShipDroneBay
+
+
+class ShipFighterBay(FighterInvCont):
+    __guid__ = 'invCont.ShipFighterBay'
+    __invControllerClass__ = invCtrl.ShipFighterBay
 
 
 class ShipFuelBay(invCont._InvContBase):

@@ -1,10 +1,10 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\inflight\shipHud\activeShipController.py
 from eve.common.script.sys.eveCfg import GetActiveShip
-from fsdlite.signal import Signal
 from localization import GetByLabel
 import blue
 import destiny
 import trinity
+import signals
 
 class ActiveShipController(object):
     __notifyevents__ = ['DoBallClear', 'ProcessActiveShipChanged']
@@ -12,7 +12,7 @@ class ActiveShipController(object):
     def __init__(self):
         sm.RegisterNotify(self)
         self.ball = None
-        self.on_new_itemID = Signal()
+        self.on_new_itemID = signals.Signal()
         self.wantedspeed = None
 
     def GetItemID(self):

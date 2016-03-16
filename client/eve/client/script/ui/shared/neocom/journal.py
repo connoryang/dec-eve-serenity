@@ -513,7 +513,9 @@ class JournalWindow(uicontrols.Window):
         self.sr.incursionEncounterScroll = uicontrols.Scroll(parent=self.sr.main, name='encounterScroll', align=uiconst.TOLEFT, width=width, state=uiconst.UI_HIDDEN)
         self.LoadIncursionDistributions()
         divider = Divider(name='incursionEncountersDivider', align=uiconst.TOLEFT, width=const.defaultPadding, parent=self.sr.main, state=uiconst.UI_HIDDEN)
-        divider.Startup(self.sr.incursionEncounterScroll, 'width', 'x', 100, 200)
+        dividerMin = 100
+        dividerMax = self.sr.incursionEncounterScroll.GetMaxTextWidth(200)
+        divider.Startup(self.sr.incursionEncounterScroll, 'width', 'x', dividerMin, dividerMax)
         divider.OnSizeChanged = self.OnIncursionEncounterResize
         self.sr.incursionEncounterDivider = divider
         self.sr.incursionReportFilter = uiprimitives.Container(name='incursionGlobalReportFilter', parent=self.sr.main, align=uiconst.TOTOP, height=36, state=uiconst.UI_HIDDEN)
@@ -985,7 +987,9 @@ class JournalWindow(uicontrols.Window):
         self.epicArcScroll.OnSelectionChange = self.SelectEpicArc
         self.epicArcScroll.multiSelect = 0
         divider = Divider(name='epicArcDivider', align=uiconst.TOLEFT, width=const.defaultPadding, parent=self.sr.epicJournalWnd, state=uiconst.UI_NORMAL)
-        divider.Startup(self.epicArcContainer, 'width', 'x', 100, 150)
+        dividerMin = 100
+        dividerMax = self.epicArcScroll.GetMaxTextWidth(150)
+        divider.Startup(self.epicArcContainer, 'width', 'x', dividerMin, dividerMax)
         divider.OnSizeChanged = self.OnEpicArcSizeChanged
         epicMissionContainerWidth = settings.user.ui.Get('journalEpicMissionWidth', 150)
         self.epicMissionContainer = uiprimitives.Container(name='epicMissionContainer', parent=self.sr.epicJournalWnd, align=uiconst.TORIGHT, clipChildren=1, width=epicMissionContainerWidth)
@@ -994,7 +998,9 @@ class JournalWindow(uicontrols.Window):
         self.epicMissionScroll.OnSelectionChange = self.SelectEpicMission
         self.epicMissionScroll.multiSelect = 0
         divider = Divider(name='epicMissionDivider', align=uiconst.TORIGHT, width=const.defaultPadding, parent=self.sr.epicJournalWnd, state=uiconst.UI_NORMAL)
-        divider.Startup(self.epicMissionContainer, 'width', 'x', 100, 200)
+        dividerMin = 100
+        dividerMax = self.epicMissionScroll.GetMaxTextWidth(200)
+        divider.Startup(self.epicMissionContainer, 'width', 'x', dividerMin, dividerMax)
         divider.OnSizeChanged = self.OnEpicMissionSizeChanged
         epicMainContainer = uiprimitives.Container(name='epicMainContainer', parent=self.sr.epicJournalWnd, align=uiconst.TOALL, clipChildren=1)
         self.epicArcTitleImage = uiprimitives.Sprite(name='epicArcTitleImage', parent=epicMainContainer, align=uiconst.TOTOP)

@@ -22,11 +22,15 @@ class ShipPOVCameraController(BaseCameraController):
         if dz < 0:
             if self.fovLevel == len(FOV_LEVELS) - 1:
                 return
-            self.fovLevel += 1
+            self._ChangeFov(1)
         elif self.fovLevel > 0:
-            self.fovLevel -= 1
+            self._ChangeFov(-1)
+
+    def _ChangeFov(self, fovLevelDiff):
+        self.fovLevel += fovLevelDiff
         sm.GetService('audio').SendUIEvent('ship_interior_cam_zoom_play')
         fov = FOV_LEVELS[self.fovLevel]
+        camera = self.GetCamera()
         uicore.animations.MorphScalar(camera, 'fov', camera.fov, fov, duration=0.35, curveType=uiconst.ANIM_OVERSHOT)
 
     def OnDblClick(self, *args):

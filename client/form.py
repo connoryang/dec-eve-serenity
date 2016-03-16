@@ -30,7 +30,6 @@ from eve.client.script.ui.inflight.moonmining import MoonMining
 from eve.client.script.ui.inflight.moonmining import SelectSiloType
 from eve.client.script.ui.inflight.orbitalConfiguration import OrbitalConfigurationWindow
 from eve.client.script.ui.inflight.overview import OverView
-from eve.client.script.ui.inflight.overview import OverviewSettings
 from eve.client.script.ui.inflight.scannerfiltereditor import ScannerFilterEditor
 from eve.client.script.ui.inflight.shipscan import CargoScan
 from eve.client.script.ui.inflight.shipscan import ShipScan
@@ -209,10 +208,11 @@ from eve.client.script.ui.shared.preview import PreviewWnd
 from eve.client.script.ui.shared.preview import PreviewCharacterWnd
 from eve.client.script.ui.shared.radioButtonMessageBox import RadioButtonMessageBox
 from eve.client.script.ui.shared.shipconfig import ShipConfig
-from eve.client.script.ui.shared.systemmenu import SystemMenu
-from eve.client.script.ui.shared.systemmenu import VoiceFontSelectionWindow
+from eve.client.script.ui.shared.systemMenu.systemmenu import SystemMenu
+from eve.client.script.ui.shared.systemMenu.systemmenu import VoiceFontSelectionWindow
 from eve.client.script.ui.shared.uilog import LoggerWindow as Logger
 from eve.client.script.ui.shared.twitch.twitchStreaming import TwitchStreaming
+from eve.client.script.ui.skilltrading.skillExtractorWindow import SkillExtractorWindow
 from eve.client.script.ui.station.agents.agentDialogueWindow import AgentDialogueWindow
 from eve.client.script.ui.station.agents.agents import AgentBrowser
 from eve.client.script.ui.station.assembleModularShip import AssembleShip

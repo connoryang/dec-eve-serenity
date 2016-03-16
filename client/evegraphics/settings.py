@@ -42,11 +42,13 @@ UI_CAMERA_OFFSET = (SETTINGS_GROUP_UI, 'cameraOffset')
 UI_OFFSET_UI_WITH_CAMERA = (SETTINGS_GROUP_UI, 'offsetUIwithCamera')
 UI_CAMERA_SHAKE_ENABLED = (SETTINGS_GROUP_UI, 'cameraShakeEnabled')
 UI_CAMERA_BOBBING_ENABLED = (SETTINGS_GROUP_UI, 'cameraBobbingEnabled')
+UI_CAMERA_SPEED_OFFSET = (SETTINGS_GROUP_UI, 'cameraSpeedOffset')
+UI_CAMERA_DYNAMIC_FOV = (SETTINGS_GROUP_UI, 'cameraDynamicFov')
+UI_CAMERA_SPEED = 'cameraSpeed'
 UI_ADVANCED_CAMERA = (SETTINGS_GROUP_UI, 'advancedCamera')
 UI_INVERT_CAMERA_ZOOM = (SETTINGS_GROUP_UI, 'invertCameraZoom')
-UI_INCARNA_CAMERA_OFFSET = (SETTINGS_GROUP_UI, 'incarnaCameraOffset')
-UI_INCARNA_CAMERA_INVERT_Y = (SETTINGS_GROUP_UI, 'incarnaCameraInvertY')
-UI_INCARNA_CAMERA_MOUSE_LOOK_SPEED = (SETTINGS_GROUP_UI, 'incarnaCameraMouseLookSpeed')
+UI_CAMERA_INVERT_Y = (SETTINGS_GROUP_UI, 'cameraInvertY')
+UI_CAMERA_SPEED = (SETTINGS_GROUP_UI, 'cameraSpeed')
 UI_NCC_GREEN_SCREEN = (SETTINGS_GROUP_UI, 'NCCgreenscreen')
 UI_SHIPSKINSINSPACE_ENABLED = (SETTINGS_GROUP_UI, 'shipskinsInSpaceEnabled')
 AA_TYPE_MSAA = 4096
@@ -160,11 +162,12 @@ defaultCommonSettings = {SETTINGS_GROUP_DEVICE: {MISC_LOAD_STATION_ENV: 1,
                      UI_OFFSET_UI_WITH_CAMERA: 0,
                      UI_CAMERA_SHAKE_ENABLED: 1,
                      UI_CAMERA_BOBBING_ENABLED: 1,
+                     UI_CAMERA_DYNAMIC_FOV: 1,
+                     UI_CAMERA_SPEED_OFFSET: 1,
                      UI_ADVANCED_CAMERA: 0,
                      UI_INVERT_CAMERA_ZOOM: 0,
-                     UI_INCARNA_CAMERA_OFFSET: 0.0,
-                     UI_INCARNA_CAMERA_INVERT_Y: 0,
-                     UI_INCARNA_CAMERA_MOUSE_LOOK_SPEED: 0.005,
+                     UI_CAMERA_INVERT_Y: 0,
+                     UI_CAMERA_SPEED: 0.0,
                      UI_NCC_GREEN_SCREEN: 0}}
 defaultClassificationSettings = {SETTINGS_GROUP_DEVICE: {DEVICE_HIGH_END: {GFX_POST_PROCESSING_QUALITY: 2,
                                            GFX_SHADOW_QUALITY: 2,

@@ -4,6 +4,7 @@ import math
 import trinity
 import geo2
 import uthread2
+import evegraphics.settings as gfxsettings
 
 class CameraBase(object):
 
@@ -17,16 +18,19 @@ class CameraBase(object):
     def GetTrinityCamera(self):
         return self._camera
 
-    def LookingAt(self):
+    def GetLookAtItemID(self):
         pass
 
     def ResetCamera(self):
         pass
 
+    def IsLocked(self):
+        return False
+
     def _ErrorListener(self, *args):
 
         def _threaded():
-            lookat = self.LookingAt()
+            lookat = self.GetLookAtItemID()
             ball = sm.GetService('michelle').GetBall(lookat)
             model = getattr(ball, 'model', None)
             if model is None:
@@ -59,11 +63,13 @@ class CameraBase(object):
     def Dolly(self, *args, **kw):
         return self._camera.Dolly(*args, **kw)
 
-    def OrbitParent(self, *args, **kw):
-        return self._camera.OrbitParent(*args, **kw)
+    def OrbitParent(self, dx, dy):
+        if gfxsettings.Get(gfxsettings.UI_CAMERA_INVERT_Y):
+            dy *= -1
+        return self._camera.OrbitParent(dx, dy)
 
-    def RotateOnOrbit(self, *args, **kw):
-        return self._camera.RotateOnOrbit(*args, **kw)
+    def RotateOnOrbit(self, dx, dy):
+        return self._camera.RotateOnOrbit(dx, dy)
 
     def SetOrbit(self, *args, **kw):
         return self._camera.SetOrbit(*args, **kw)

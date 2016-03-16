@@ -106,7 +106,7 @@ def GetFormattedAttributeAndValue(attributeID, value):
     if not iconID:
         if attribute.unitID == dogmaConst.unitTypeID:
             iconID = evetypes.GetIconID(value)
-            infoTypeID = value
+            infoTypeID = int(value)
         if attribute.unitID == dogmaConst.unitGroupID:
             iconID = evetypes.GetGroupIconIDByGroup(value)
         if attribute.unitID == dogmaConst.unitAttributeID:

@@ -5,6 +5,11 @@ from evecamera import LOOKATRANGE_MAX, LOOKATRANGE_MAX_NEW
 from evegraphics import settings as gfxsettings
 import geo2
 import evespacescene
+import trinity
+import blue
+import destiny
+from evecamera.utils import GetARZoomMultiplier
+import uthread
 
 def IsNewCameraActive():
     return betaOptions.BetaFeatureEnabled(betaOptions.BETA_NEWCAM_SETTING_KEY)
@@ -48,11 +53,14 @@ def SetShipDirection(camera):
 
 
 def GetZoomDz():
-    if gfxsettings.Get(gfxsettings.UI_INVERT_CAMERA_ZOOM):
-        dz = -uicore.uilib.dz
-    else:
-        dz = uicore.uilib.dz
+    dz = CheckInvertZoom(uicore.uilib.dz)
     return GetPowerOfWithSign(dz)
+
+
+def CheckInvertZoom(dz):
+    if gfxsettings.Get(gfxsettings.UI_INVERT_CAMERA_ZOOM):
+        return -dz
+    return dz
 
 
 def GetPowerOfWithSign(value, power = 1.1):
@@ -75,3 +83,92 @@ def GetBallRadius(ball):
     if rad is None or rad <= 0.0:
         rad = ball.radius
     return rad
+
+
+def GetBallPosition(ball):
+    if hasattr(ball, 'model') and not isinstance(ball.model, trinity.EvePlanet):
+        elpc = trinity.EveLocalPositionCurve()
+        elpc.parent = ball.model
+        elpc.behavior = trinity.EveLocalPositionBehavior.centerBounds
+        vec = elpc.GetVectorAt(blue.os.GetSimTime())
+    else:
+        vec = ball.GetVectorAt(blue.os.GetSimTime())
+    return (vec.x, vec.y, vec.z)
+
+
+def GetBall(itemID):
+    bp = sm.GetService('michelle').GetBallpark()
+    if not bp:
+        return None
+    return bp.GetBall(itemID)
+
+
+def GetBallMaxZoom(ball, nearClip):
+    rad = GetBallRadius(ball)
+    zoomMultiplier = 1.5 * GetARZoomMultiplier(trinity.GetAspectRatio())
+    return (rad + nearClip) * zoomMultiplier + 2
+
+
+def IsBallWarping(itemID):
+    ball = GetBall(itemID)
+    if not ball:
+        return False
+    return ball.mode == destiny.DSTBALL_WARP
+
+
+def IsAutoTrackingEnabled():
+    return settings.char.ui.Get('orbitCameraAutoTracking', False)
+
+
+def CheckShowModelTurrets(ball):
+    if hasattr(ball, 'LookAtMe'):
+        uthread.new(ball.LookAtMe)
+
+
+class Vector3Chaser(object):
+
+    def __init__(self, speed = 1.0):
+        self._value = (0, 0, 0)
+        self._targetValue = None
+        self._speed = speed
+
+    def GetValue(self):
+        return self._value
+
+    def SetValue(self, value, speed = None):
+        self._targetValue = value
+        if speed is not None:
+            self._speed = speed
+
+    def Update(self):
+        if not self._targetValue or self._targetValue == self._value:
+            return
+        if self._speed == 0.0:
+            return
+        dt = 1.0 / blue.os.fps
+        diff = geo2.Vec3Subtract(self._targetValue, self._value)
+        prop = dt * (1.0 * self._speed)
+        prop = min(1.0, prop)
+        dV = geo2.Vec3Scale(diff, prop)
+        self._value = geo2.Vec3Add(self._value, dV)
+        if prop == 1.0:
+            self._targetValue = None
+
+    def ResetValue(self, speed = None):
+        self.SetValue((0, 0, 0), speed)
+
+
+class VectorLerper(object):
+
+    def __init__(self, duration = 1.0):
+        self.duration = duration
+        self.startTime = blue.os.GetSimTime()
+
+    def GetValue(self, v0, v1):
+        t = (blue.os.GetSimTime() - self.startTime) / float(SEC)
+        if t >= self.duration:
+            return v1
+        elif hasattr(v0, '__iter__'):
+            return geo2.Lerp(v0, v1, t / self.duration)
+        else:
+            return v0 + (v1 - v0) * t

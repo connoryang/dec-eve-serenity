@@ -118,7 +118,7 @@ class TreeViewEntry(ContainerAutoSize):
         if self.childCont is None or self.childCont.display == show or not self.data.HasChildren():
             return
         for child in self.childCont.children:
-            child.display = show
+            self.ShowChild(child, show=show)
 
         self.isToggling = True
         if animate:
@@ -147,6 +147,9 @@ class TreeViewEntry(ContainerAutoSize):
                 self.childCont.DisableAutoSize()
                 self.childCont.opacity = 0.0
         self.isToggling = False
+
+    def ShowChild(self, child, show = True):
+        child.display = show
 
     def UpdateSelectedState(self, selectedIDs):
         invID = self.data.GetID()

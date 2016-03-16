@@ -1,7 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\dogma\attributes\attribute.py
 import dogma
 from dogma.dogmaLogging import *
-from characterskills.util import GetSkillLevelRaw
+from characterskills import GetSkillLevelRaw
 from dogma.attributes import CalculateHeat
 import operator
 import bisect
@@ -82,7 +82,7 @@ class AttributeInterface(object):
     def CheckIntegrity(self):
         if self.IsAnOrphan():
             LogWarn("CheckIntegrity: 'Orphan' Attribute detected (its dogmaItem has gone!):", self)
-            TraceReferrers(self, depthLimit=6)
+            LogWarn('TraceReferrers is BEING SUPPRESSED in case it overloads the node! (Sorry)')
             LogTraceback('Orphan Attribute!')
             return False
         else:
@@ -726,8 +726,8 @@ class StackingNurfedAttribute(Attribute):
                 return True
         except ReferenceError:
             LogWarn("_ShouldNotNurf: 'Orphan' Attribute detected (its dogmaItem has gone!):", attribute)
-            LogWarn('referrers are:')
-            TraceReferrers(self)
+            LogWarn('TraceReferrers is BEING SUPPRESSED in case it overloads the node! (Sorry)')
+            LogTraceback('Orphan Attribute! (via _ShouldNotNurf)')
 
         if hasattr(attribute, 'forceUnnurfed') and attribute.forceUnnurfed:
             return True

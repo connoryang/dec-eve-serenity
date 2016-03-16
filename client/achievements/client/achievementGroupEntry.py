@@ -1,6 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\packages\achievements\client\achievementGroupEntry.py
 from achievements.client.achievementTaskEntry import AchievementTaskEntry
 from achievements.client.auraAchievementWindow import AchievementAuraWindow
+from achievements.common.opportunityTaskMap import GROUP_TO_REWARD
 from carbonui.primitives.base import ReverseScaleDpi
 from carbonui.primitives.container import Container
 from carbonui.primitives.containerAutoSize import ContainerAutoSize
@@ -10,6 +11,7 @@ import carbonui.const as uiconst
 import uthread
 from eve.client.script.ui.control.eveLabel import EveLabelSmall, EveLabelLarge, EveHeaderLarge, EveCaptionLarge, EveCaptionMedium
 from localization import GetByLabel
+import gatekeeper
 POINTER_PADRIGHT = 7
 
 class AchievementGroupEntry(ContainerAutoSize):
@@ -35,6 +37,7 @@ class AchievementGroupEntry(ContainerAutoSize):
     def ConstructLayout(self):
         headerContainer = Container(parent=self, align=uiconst.TOTOP, height=28, padTop=4, padBottom=6)
         self.groupName = EveLabelLarge(parent=headerContainer, align=uiconst.CENTERLEFT, left=8)
+        self.rewardAmount = EveLabelLarge(parent=headerContainer, align=uiconst.CENTERRIGHT, left=8, state=uiconst.UI_NORMAL, bold=True)
         Frame(texturePath='res:/UI/Texture/classes/Achievements/pointRightHeaderFrame.png', cornerSize=16, offset=-14, parent=headerContainer, color=(1, 1, 1, 0.25), align=uiconst.TOALL)
         progressClipper = Container(parent=headerContainer, align=uiconst.TOALL, clipChildren=True, padRight=-POINTER_PADRIGHT)
         self.progress = Frame(texturePath='res:/UI/Texture/classes/Achievements/pointRightHeaderBackground.png', cornerSize=15, offset=-13, parent=progressClipper, color=(1, 1, 1, 0.25))
@@ -45,7 +48,18 @@ class AchievementGroupEntry(ContainerAutoSize):
     def LoadGroupData(self, groupData, blinkAchievementID = None, animateIn = False):
         if not self.groupData or self.groupData.groupID != groupData.groupID:
             self.groupData = groupData
-            self.groupName.text = self.groupData.groupName
+            self.groupName.text = GetByLabel(self.groupData.groupName)
+            rewardText = ''
+            if gatekeeper.user.IsInCohort(gatekeeper.cohortTEXOpportunityRewards):
+                import util
+                rewardAmount = GROUP_TO_REWARD.get(self.groupData.groupID, 0)
+                if rewardAmount > 0:
+                    rewardText = util.FmtISK(rewardAmount, showFractionsAlways=False)
+                self.rewardAmount.text = rewardText
+            if rewardText != '':
+                self.rewardAmount.state = uiconst.UI_NORMAL
+            else:
+                self.rewardAmount.state = uiconst.UI_HIDDEN
             self.AddAchievementTasks(blinkAchievementID=blinkAchievementID, animateIn=animateIn)
             if animateIn:
                 self.AnimateIn()
@@ -60,6 +74,12 @@ class AchievementGroupEntry(ContainerAutoSize):
             self.UpdateState(changedAchievementID=achievement.achievementID)
 
     def UpdateProgress(self):
+        if self.groupData.IsCompleted():
+            self.rewardAmount.color = (0.0, 0.8, 0.0, 1)
+            self.rewardAmount.hint = GetByLabel('UI/Achievements/OpportunityRewardGiven')
+        else:
+            self.rewardAmount.color = (0.8, 0.8, 0.0, 1)
+            self.rewardAmount.hint = GetByLabel('UI/Achievements/OpportunityRewardNotGiven')
         progressProportion = self.groupData.GetProgressProportion()
         maxWidth = ReverseScaleDpi(self.displayWidth) - POINTER_PADRIGHT
         uicore.animations.MorphScalar(self.progress, 'padRight', startVal=self.progress.padRight, endVal=POINTER_PADRIGHT + maxWidth * (1 - progressProportion), curveType=uiconst.ANIM_SMOOTH, duration=0.33)
@@ -105,7 +125,7 @@ class AchievementGroupEntry(ContainerAutoSize):
         extraInfo = self.groupData.extraInfo
         tipsHeader = EveLabelSmall(text=GetByLabel('UI/Achievements/TipsAndInfoHeader'), width=200, bold=True)
         tooltipPanel.AddCell(tipsHeader, colSpan=tooltipPanel.columns)
-        tipsText = EveLabelSmall(text=self.groupData.groupDescription, align=uiconst.TOTOP)
+        tipsText = EveLabelSmall(text=GetByLabel(self.groupData.groupDescription), align=uiconst.TOTOP)
         tooltipPanel.AddCell(tipsText, colSpan=tooltipPanel.columns)
         for info in extraInfo:
             icon = Sprite(name='icon', parent=tooltipPanel, pos=(0,

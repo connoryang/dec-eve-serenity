@@ -77,6 +77,7 @@ class BookmarkLocationWindow(uicontrols.Window):
             sm.GetService('bookmarkSvc').BookmarkScanResult(self.locationID, label, note, self.scannerInfo.id, ownerID, folderID=folderID)
         else:
             sm.GetService('bookmarkSvc').BookmarkLocation(self.locationID, ownerID, label, note, self.typeID, self.parentID, folderID=folderID)
+        sm.ScatterEvent('OnRefreshBookmarks')
         settings.char.ui.Set('defaultBookmarkOwnerAndFolder', (ownerID, folderID))
         self.Close()
 

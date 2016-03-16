@@ -14,3 +14,7 @@ targetGroupsWithNoSecurityPenalty = targetGroupsWithSuspectPenaltyInHighSec = (i
  inventorycommon.const.groupMobileScanInhibitor,
  inventorycommon.const.groupMobileMicroJumpUnit)
 targetGroupsWithNoPenalties = (inventorycommon.const.groupSiphonPseudoSilo,)
+containerGroupsWithLootRights = (inventorycommon.const.groupWreck,
+ inventorycommon.const.groupCargoContainer,
+ inventorycommon.const.groupFreightContainer,
+ inventorycommon.const.groupSpewContainer)

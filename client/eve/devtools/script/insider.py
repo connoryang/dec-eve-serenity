@@ -822,10 +822,6 @@ class InsiderService(service.Service):
     def CycleNebulas(self, *args):
         CycleNebulaPanel(parent=uicore.layer.main, name='CycleNebulaPanel', caption='Cycle Nebulas')
 
-    def ToggleImpactEffects(self, *args):
-        current = trinity.settings.GetValue('eveSpaceObjectImpactEffectEnabled')
-        trinity.settings.SetValue('eveSpaceObjectImpactEffectEnabled', not current)
-
     def V3Testing(self, *args):
         log.LogError('Starting V3 testing...')
         dlgRes = uix.GetFileDialog(fileExtensions=['.txt'], multiSelect=False, selectionType=uix.SEL_FILES)
@@ -1400,7 +1396,6 @@ class InsiderService(service.Service):
           ('SOF Previewer', sofpreviewer.SOFPreviewWindow().ShowUI),
           ('Warp Effect Debug', gfxreports.ShowWarpEffectReport),
           ('Flight Controls Debug', sm.GetService('flightControls').simulation.ToggleDebug),
-          ('Toggle Impact Effects', self.ToggleImpactEffects),
           ('Toggle Background Dithering', ToggleBackgroundDithering),
           ('Asteroid Environment', (('Enable Environment', GetAsteroidEnvToggler(gfxsettings.UI_ASTEROID_ATMOSPHERICS, True)),
             ('Disable Environment', GetAsteroidEnvToggler(gfxsettings.UI_ASTEROID_ATMOSPHERICS, False)),
@@ -1461,12 +1456,14 @@ class InsiderService(service.Service):
     def DroneMenu(self, *args):
         m = []
         dronemenu = sm.GetService('charge').DroneMenu()
-        for entry in dronemenu:
-            try:
-                m.append((entry[0], entry[1]))
-            except:
-                sys.exc_clear()
-                m.append(None)
+        fighterMenu = sm.GetService('fighters').FightersMenu()
+        for menu in [dronemenu, fighterMenu]:
+            for entry in menu:
+                try:
+                    m.append((entry[0], entry[1]))
+                except:
+                    sys.exc_clear()
+                    m.append(None)
 
         self.MakeMenu(m, 'Drones_Btn')
 
@@ -1694,9 +1691,17 @@ class InsiderService(service.Service):
         toolMenu.append(('Engine tools', lambda : EngineToolsLauncher.Open()))
         toolMenu.append(('Report Bug', lambda : sm.GetService('bugReporting').StartCreateBugReport()))
         toolMenu.append(('Get camera distance', lambda : self.GetDistanceFromCamera()))
+        toolMenu.append(('Tutorial videos override', lambda : self.TutorialVideosOverride()))
         toolMenu.append(None)
         toolMenu += self.ExpoMenu()
         self.MakeMenu(toolMenu, 'Tools_Btn')
+
+    def TutorialVideosOverride(self):
+        import eve.client.script.ui.shared.neocom.help as help
+        from videoplayer.index import VideoIndex
+        path = uix.GetFileDialog(selectionType=uix.SEL_FOLDERS)
+        if path is not None:
+            help.TUTORIAL_VIDEOS_INDEX = VideoIndex(os.path.join(path.folders[0], 'index.json'))
 
     def CreateDefect(self, *args):
         sm.GetService('bugReporting').StartCreateBugReport()

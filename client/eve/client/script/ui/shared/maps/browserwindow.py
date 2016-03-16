@@ -1,5 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\maps\browserwindow.py
 import blue
+from carbonui.primitives.base import Base
 import uthread
 import uiutil
 import trinity
@@ -49,6 +50,12 @@ class MapBrowserWnd(uicontrols.Window):
     def Close(self, *args, **kwds):
         self.Hide()
         uicontrols.Window.Close(self, *args, **kwds)
+
+    def GetAbsolutePosition(self):
+        stack = self.GetStack()
+        if stack:
+            return stack.sr.content.GetAbsolutePosition()
+        return Base.GetAbsolutePosition(self)
 
     def Hide(self, *args, **kwargs):
         self.state = uiconst.UI_HIDDEN

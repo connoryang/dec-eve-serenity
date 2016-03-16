@@ -92,6 +92,8 @@ class GenericEffect:
 
     def ScaleEffectAudioEmitter(self, entity, scaler = 1.0):
         srcRadius = self.GetEffectRadius()
+        if srcRadius < 0:
+            return
         attenuation = pow(srcRadius, 0.95) * 33 * scaler
         if entity is not None:
             entity.SetAttenuationScalingFactor(attenuation)
@@ -130,7 +132,7 @@ class GenericEffect:
 
     def SendAudioEvent(self, eventName):
         triObserver = self.observer
-        if triObserver is not None:
+        if hasattr(triObserver, 'observer'):
             triObserver.observer.SendEvent(eventName)
 
     def AttachObserverToModel(self, model):

@@ -5,12 +5,24 @@ import carbonui.const as uiconst
 
 class SidePanels(uicls.LayerCore):
     __guid__ = 'uicls.SidePanelsLayer'
+    __notifyevents__ = ['OnHideUI', 'OnShowUI']
 
     def ApplyAttributes(self, attributes):
         uicls.LayerCore.ApplyAttributes(self, attributes)
         self.inactivePanels = ['sidePanel']
         self.leftPush = 0
         self.rightPush = 0
+        sm.RegisterNotify(self)
+
+    def OnShowUI(self):
+        for each in self.children:
+            if each.align != uiconst.TOALL:
+                each.display = True
+
+    def OnHideUI(self):
+        for each in self.children:
+            if each.align != uiconst.TOALL:
+                each.display = False
 
     def OnOpenView(self):
         sm.GetService('neocom').CreateNeocom()

@@ -1,8 +1,8 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\skins\controller.py
-from fsdlite import Signal
 from itertoolsext import first
 import locks
 import uthread
+import signals
 
 class SkinPanelAdapter(object):
 
@@ -46,8 +46,8 @@ class SkinPanelController(object):
         self._adapter = adapter or SkinPanelAdapter()
         self._lock = locks.Lock()
         self.Reset(typeID)
-        self.onChange = Signal()
-        self.onSkinsChange = Signal()
+        self.onChange = signals.Signal()
+        self.onSkinsChange = signals.Signal()
         self.onSkinsChange.connect(self.onChange)
         self._adapter.RegisterNotify(self)
 

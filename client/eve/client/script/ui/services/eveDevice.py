@@ -370,5 +370,3 @@ class EveDeviceMgr(DeviceMgr):
         effectsEnabled = gfxsettings.Get(gfxsettings.UI_EFFECTS_ENABLED)
         trailsEnabled = effectsEnabled and gfxsettings.Get(gfxsettings.UI_TRAILS_ENABLED)
         trinity.settings.SetValue('eveSpaceObjectTrailsEnabled', trailsEnabled)
-        gpuParticlesEnabled = effectsEnabled and gfxsettings.Get(gfxsettings.UI_GPU_PARTICLES_ENABLED)
-        trinity.settings.SetValue('gpuParticlesEnabled', gpuParticlesEnabled)

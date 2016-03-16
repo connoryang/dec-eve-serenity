@@ -1,5 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\mapView\dockPanelManager.py
-from eve.client.script.ui.shared.mapView.dockPanelConst import SETTINGSKEY
+from eve.client.script.ui.shared.mapView.dockPanelConst import ALL_PANELS
+from eve.client.script.ui.shared.mapView.dockPanelUtil import RegisterPanelSettings
 from eve.client.script.ui.view.viewStateConst import ViewState
 import uthread
 import carbonui.const as uiconst
@@ -12,6 +13,7 @@ class DockablePanelManager(object):
     panels = {}
 
     def __init__(self):
+        settings.char.CreateGroup('dockPanels')
         sm.RegisterNotify(self)
 
     def OnViewStateClosed(self):
@@ -92,7 +94,15 @@ class DockablePanelManager(object):
 
             currentSettings = panel.GetPanelSettings()
             currentSettings['pushedBy'] = pushedBy
-            settings.char.ui.Set(SETTINGSKEY % panel.panelID, currentSettings)
+            RegisterPanelSettings(panel.panelID, currentSettings)
+
+    def ResetAllPanelSettings(self):
+        settings.char.Remove('dockPanels')
+        for panelID in ALL_PANELS:
+            panel = self.GetPanel(panelID)
+            if panel and not panel.destroyed:
+                panel.Close()
+                panel.OpenPanel()
 
     def OnUIScalingChange(self, *args):
         for panel in self.panels.values():

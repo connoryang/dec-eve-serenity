@@ -128,23 +128,21 @@ def RemoveFromQuickBar(node):
     sm.ScatterEvent('OnMarketQuickbarChange')
 
 
-def TryLookAt(itemID):
+def TryLookAt(itemID, radius = None):
     slimItem = uix.GetBallparkRecord(itemID)
-    if not slimItem:
+    isSiteBall = sm.GetService('sensorSuite').IsSiteBall(itemID)
+    if not slimItem and not isSiteBall:
         return
-    sm.GetService('sceneManager').GetActiveCamera().LookAt(itemID)
+    sm.GetService('sceneManager').GetActiveCamera().LookAt(itemID, radius=radius)
 
 
-def ToggleLookAt(itemID):
+def ToggleLookAt(itemID, radius = None):
     bp = sm.GetService('michelle').GetBallpark()
     if bp:
         ball = bp.GetBall(session.shipid)
         if ball and ball.mode == destiny.DSTBALL_WARP:
             return
-    if sm.GetService('sceneManager').GetActiveCamera().LookingAt() == itemID and itemID != session.shipid:
-        TryLookAt(session.shipid)
-    else:
-        TryLookAt(itemID)
+    TryLookAt(itemID, radius)
 
 
 def AbandonLoot(wreckID):
@@ -416,6 +414,21 @@ def ActivateSkinLicense(itemID, typeID):
         parameters['days'] = license.duration
     if eve.Message(key, parameters, uiconst.YESNO) == uiconst.ID_YES:
         sm.GetService('skinSvc').ActivateSkinLicense(itemID, typeID)
+
+
+def ActivateSkillExtractor(item):
+    sm.GetService('skills').ActivateSkillExtractor(item)
+
+
+def ActivateSkillInjector(itemID, quantity):
+    totalPoints = sm.GetService('skills').GetSkillPointAmountFromInjectors(quantity)
+    parameters = {'character': session.charid,
+     'injector': const.typeSkillInjector,
+     'quantity': quantity,
+     'points': totalPoints}
+    key = 'ActivateSkillInjectorConfirmation'
+    if eve.Message(key, parameters, uiconst.YESNO) == uiconst.ID_YES:
+        sm.GetService('skills').ActivateSkillInjector(itemID, quantity)
 
 
 def AbortSelfDestructShip(pickid):

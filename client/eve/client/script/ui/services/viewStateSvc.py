@@ -69,9 +69,6 @@ class View(object):
     def CheckShouldReopen(self, newKwargs, cachedKwargs):
         return newKwargs == cachedKwargs
 
-    def ToggleCamera(self):
-        pass
-
     def __repr__(self):
         return '%s(name=%s)' % (self.__class__.__name__, self.name)
 

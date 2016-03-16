@@ -89,7 +89,7 @@ class AchievementTaskEntry(ContainerAutoSize):
         self.UpdateAchievementTaskState()
         newHeight = max(self.checkbox.height + 2 * self.checkbox.top, self.achievementText.textheight + 2 * self.achievementText.padTop)
         self.headerContainer.height = newHeight
-        if attributes.blinkIn and self.achievementTask.completed:
+        if attributes.blinkIn and self.IsTaskCompleted():
             uthread.new(uicore.animations.BlinkIn, self, duration=0.2, loops=4)
 
     def ToggleDetails(self):
@@ -162,8 +162,12 @@ class AchievementTaskEntry(ContainerAutoSize):
             else:
                 AchievementAuraWindow.Open(loadAchievementTask=self.achievementTask, loadAchievementGroup=self.achievementGroup)
 
+    def IsTaskCompleted(self):
+        completedTasks = sm.GetService('achievementSvc').GetCompletedTaskIds()
+        return self.achievementTask.achievementID in completedTasks
+
     def UpdateAchievementTaskState(self, animate = False):
-        if self.achievementTask.completed:
+        if self.IsTaskCompleted():
             self.checkbox.SetTexturePath(self.checkedTexturePath)
             if animate:
                 self.completedFill.displayWidth = 0.0

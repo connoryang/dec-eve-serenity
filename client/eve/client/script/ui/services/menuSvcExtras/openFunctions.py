@@ -21,6 +21,15 @@ def OpenDroneBay(itemIDs):
         form.Inventory.OpenOrShow(invID=invID, usePrimary=usePrimary, openFromWnd=openFromWnd)
 
 
+def OpenFighterBay(itemIDs):
+    usePrimary = len(itemIDs) == 1
+    openFromWnd = uicore.registry.GetActive() if usePrimary else None
+    for itemID in itemIDs:
+        invID = ('ShipFighterBay', itemID)
+        invCtrl.ShipFighterBay(itemID).GetItems()
+        form.Inventory.OpenOrShow(invID=invID, usePrimary=usePrimary, openFromWnd=openFromWnd)
+
+
 def OpenShipMaintenanceBayShip(itemID, name):
     invID = ('ShipMaintenanceBay', itemID)
     if itemID != util.GetActiveShip() and not session.stationid2:

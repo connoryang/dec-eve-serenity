@@ -111,7 +111,8 @@ class StarMapSvc(service.Service):
      'OnAvoidanceItemsChanged',
      'OnMapReset',
      'OnUIScalingChange',
-     'OnAutopilotUpdated']
+     'OnAutopilotUpdated',
+     'OnDestinationChange']
     __servicename__ = 'starmap'
     __displayname__ = 'Star Map Client Service'
     __dependencies__ = ['clientPathfinderService',
@@ -2073,6 +2074,10 @@ class StarMapSvc(service.Service):
         elif destinationID in self.GetKnownUniverseSolarSystems():
             isDestinationValid = True
         return isDestinationValid
+
+    def OnDestinationChange(self, solarSystemID, clearOtherWaypoints, first):
+        sm.GetService('autoPilot').SetOff('Waypoints set remotely.')
+        self.SetWaypoint(solarSystemID, clearOtherWaypoints, first)
 
     @telemetry.ZONE_METHOD
     def SetWaypoint(self, destinationID, clearOtherWaypoints = False, first = False):

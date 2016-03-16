@@ -783,6 +783,8 @@ dunTriggerEventTimerStart = 49
 dunTriggerEventWarpShipAwayAndComeBack = 41
 dunTriggerEventWarpShipAwayDespawn = 40
 dunTriggerEventStartTale = 54
+dunTriggerEventSpawnEntityByTypeID = 55
+dunWanderingNpcGroups = [groupBoss]
 dunEventMessageParamCharacter = 0
 dunEventMessageParamFleet = 1
 dunEventMessageParamRoom = 2
@@ -1007,6 +1009,7 @@ refIndustryTeamEscrowReimbursement = 119
 refIndustryFacilityTax = 120
 refSweatAurum = 121
 refInfrastructureHubBill = 122
+refOpportunityReward = 124
 refMaxEve = 10000
 refCorporationTaxNpcBounties = 92
 refCorporationTaxAgentRewards = 93
@@ -1894,24 +1897,31 @@ graphicCorpLogoLibColors = {671: ((0.125, 0.125, 0.125, 1.0), CORPLOGO_SOLID),
  684: ((0.91, 0.91, 0.91, 1.0), CORPLOGO_SOLID),
  685: ((1.0, 0.7, 0.24, 1.0), CORPLOGO_SOLID)}
 CORPLOGO_DEFAULT_COLOR = ((1.0, 1.0, 1.0, 1.0), CORPLOGO_BLEND)
-iconUnknown = 0
-iconSkill = 33
-iconModuleSensorDamper = 105
-iconModuleECM = 109
-iconModuleWarpScrambler = 111
-iconModuleFocusedWarpScrambler = 21489
-iconModuleWarpScramblerMWD = 3433
-iconModuleStasisWeb = 1284
 iconDuration = 1392
-iconModuleTrackingDisruptor = 1639
-iconModuleGuidanceDisruptor = 21437
-iconModuleTargetPainter = 2983
-iconModuleDroneCommand = 2987
-iconModuleNosferatu = 1029
-iconModuleEnergyNeutralizer = 1283
-iconWillpower = 3127
 iconFemale = 3267
 iconMale = 3268
+iconModuleArmorRepairer = 21426
+iconModuleDroneCommand = 2987
+iconModuleECCMProjector = 110
+iconModuleECM = 109
+iconModuleEnergyNeutralizer = 1283
+iconModuleEnergyTransfer = 1035
+iconModuleFocusedWarpScrambler = 21489
+iconModuleGuidanceDisruptor = 21437
+iconModuleHullRepairer = 21428
+iconModuleNosferatu = 1029
+iconModuleRemoteTracking = 3346
+iconModuleSensorBooster = 74
+iconModuleSensorDamper = 105
+iconModuleShieldBooster = 86
+iconModuleStasisWeb = 1284
+iconModuleTargetPainter = 2983
+iconModuleTrackingDisruptor = 1639
+iconModuleWarpScrambler = 111
+iconModuleWarpScramblerMWD = 3433
+iconSkill = 33
+iconUnknown = 0
+iconWillpower = 3127
 invulnerabilityDocking = 3000
 invulnerabilityJumping = 5000
 invulnerabilityRestoring = 60000
@@ -2007,6 +2017,8 @@ skillEventSkillInjected = 56
 skillEventFreeSkillPointsUsed = 307
 skillEventGMReverseFreeSkillPointsUsed = 309
 skillEventSkillRemoved = 177
+skillEventSkillExtracted = 431
+skillEventSkillExtractionReverted = 432
 solarsystemTimeout = 86400
 sovereigntyDisruptorAnchorRange = 20000
 sovereigntyDisruptorAnchorRangeMinBetween = 45000
@@ -2824,7 +2836,8 @@ canFitShipGroups = [1298,
  1872,
  1879,
  1880,
- 1881]
+ 1881,
+ 2065]
 canFitShipTypes = [1302,
  1303,
  1304,
@@ -2849,3 +2862,10 @@ VIP_LEVEL_MAX = 15
 SELLING_TO_NPC_DISCOUNT = 367674
 IHUB_DAILY_UPKEEP_BASE_COST = 6000000
 IHUB_BILLING_DURATION_DAYS = 7
+SKILL_TRADING_BUCKET_SIZE = 500000
+SKILL_TRADING_FREE_ZONE = 5000000
+SKILL_TRADING_LOW_DIMINISH = (50000000, 0.8)
+SKILL_TRADING_MEDIUM_DIMINISH = (80000000, 0.6)
+SKILL_TRADING_FULL_DIMINISH = 0.3
+SKILL_TRADING_MINIMUM_SP_TO_EXTRACT = 5000000 + SKILL_TRADING_BUCKET_SIZE
+SKILL_TRADING_MAXIMUM_INJECT_STACK_SIZE = 10000

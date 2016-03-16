@@ -24,17 +24,25 @@ class CameraTool(Window):
 
     def Update(self):
         while not self.destroyed:
-            cam = sm.GetService('sceneManager').GetActiveCamera()
-            text = '_atPosition: %2.2f, %2.2f, %2.2f' % cam._atPosition
-            atOffset = cam._atOffset or (0, 0, 0)
-            text += '\n_atOffset: %2.2f, %2.2f, %2.2f' % atOffset
-            text += '\n_eyePosition: %2.2f, %2.2f, %2.2f' % cam._eyePosition
-            eyeOffset = cam._eyeOffset or (0, 0, 0)
-            text += '\n_eyeOffset: %2.2f, %2.2f, %2.2f' % eyeOffset
-            eyeAndAtOffset = cam._eyeAndAtOffset or (0, 0, 0)
-            text += '\n_eyeAndAtOffset: %2.2f, %2.2f, %2.2f' % eyeAndAtOffset
-            self.atLabel.text = text
-            blue.synchro.Yield()
+            try:
+                cam = sm.GetService('sceneManager').GetActiveCamera()
+                text = 'CameraID: <b>%s</b>' % cam.cameraID
+                text += '\n\n_atPosition: %2.2f, %2.2f, %2.2f' % cam._atPosition
+                atOffset = cam._atOffset or (0, 0, 0)
+                text += '\n_atOffset: %2.2f, %2.2f, %2.2f' % atOffset
+                text += '\n_eyePosition: %2.2f, %2.2f, %2.2f' % cam._eyePosition
+                eyeOffset = cam._eyeOffset or (0, 0, 0)
+                text += '\n_eyeOffset: %2.2f, %2.2f, %2.2f' % eyeOffset
+                eyeAndAtOffset = cam._eyeAndAtOffset or (0, 0, 0)
+                text += '\n_eyeAndAtOffset: %2.2f, %2.2f, %2.2f' % eyeAndAtOffset
+                text += '\nzoomProportion: %2.2f' % cam.GetZoomProportion()
+                text += '\nminZoom: %2.2f' % cam.minZoom
+                text += '\nmaxZoom: %2.2f' % cam.maxZoom
+                self.atLabel.text = text
+            except:
+                pass
+            finally:
+                blue.synchro.Yield()
 
     def ReloadCamera(self, *args):
         sceneMan = sm.GetService('sceneManager')

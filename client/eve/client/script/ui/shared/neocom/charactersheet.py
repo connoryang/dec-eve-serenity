@@ -1,4 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\neocom\charactersheet.py
+from carbonui.primitives.container import Container
 from carbonui.primitives.containerAutoSize import ContainerAutoSize
 from carbonui.primitives.flowcontainer import FlowContainer, CONTENT_ALIGN_CENTER
 from eve.client.script.ui.control.infoIcon import InfoIcon
@@ -14,7 +15,7 @@ import uiutil
 from eve.client.script.ui.control.divider import Divider
 import form
 import util
-import characterskills.util
+import characterskills as charskills
 from eve.client.script.ui.control import entries as listentry
 from eve.client.script.ui.shared.killReportUtil import OpenKillReport
 import base
@@ -28,6 +29,7 @@ from eve.client.script.ui.shared.neocom.charsheet.skins import CharacterSkinsPan
 import evetypes
 from eve.client.script.ui.tooltips.tooltipsWrappers import TooltipHeaderDescriptionWrapper
 from eve.client.script.ui.shared.monetization.events import LogCharacterSheetPilotLicenseImpression, LogMultiPilotTrainingBannerImpression
+from eve.client.script.ui.skilltrading.banner import IsSkillInjectorBannerDismissed, SkillInjectorBanner
 MAXBIOLENGTH = 1000
 
 class CharacterSheet(service.Service):
@@ -180,7 +182,7 @@ class CharacterSheet(service.Service):
         uthread.new(self._HighlightSkillHistorySkills, args=skillTypeIds)
 
     def _HighlightSkillHistorySkills(self, args):
-        skillTypeIds = args
+        trainingRecords = args
         wnd = self.GetOrOpenWnd()
         if wnd:
             blue.pyos.synchro.SleepWallclock(50)
@@ -189,11 +191,12 @@ class CharacterSheet(service.Service):
             wnd.sr.skilltabs.SelectByIdx(2)
             self.DeselectAllNodes(wnd)
             blue.pyos.synchro.SleepWallclock(500)
-            skillIDsCopy = skillTypeIds[:]
+            skillIDsCopy = trainingRecords[:]
             for node in wnd.sr.scroll.GetNodes():
-                if node.id in skillIDsCopy:
+                recordKey = (node.id, node.level)
+                if recordKey in skillIDsCopy:
                     wnd.sr.scroll._SelectNode(node)
-                    skillIDsCopy.remove(node.id)
+                    skillIDsCopy.remove(recordKey)
 
     def OnMultipleCharactersTrainingRefreshed(self):
         if self.showing == 'pilotlicense':
@@ -507,7 +510,7 @@ class CharacterSheet(service.Service):
                     wnd.sr.combatlogpanel.state = uiconst.UI_NORMAL
                 if not wnd.sr.killsinited:
                     wnd.sr.killsinited = 1
-                    btnContainer = uiprimitives.Container(name='pageBtnContainer', parent=wnd.sr.mainArea, align=uiconst.TOBOTTOM, idx=0, padBottom=4)
+                    btnContainer = Container(name='pageBtnContainer', parent=wnd.sr.mainArea, align=uiconst.TOBOTTOM, idx=0, padBottom=4)
                     btn = uix.GetBigButton(size=22, where=btnContainer, left=4, top=0)
                     btn.SetAlign(uiconst.CENTERRIGHT)
                     btn.hint = localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/KillsTabs/ViewMore')
@@ -574,7 +577,7 @@ class CharacterSheet(service.Service):
         wnd.sr.charinfo = charinfo = self.charMgr.GetPublicInfo(eve.session.charid)
         if settings.user.ui.Get('charsheetExpanded', 1):
             parent = wnd.sr.topParent
-            wnd.sr.picParent = uiprimitives.Container(name='picpar', parent=parent, align=uiconst.TOPLEFT, width=200, height=200, left=const.defaultPadding, top=16)
+            wnd.sr.picParent = Container(name='picpar', parent=parent, align=uiconst.TOPLEFT, width=200, height=200, left=const.defaultPadding, top=16)
             wnd.sr.pic = uiprimitives.Sprite(parent=wnd.sr.picParent, align=uiconst.TOALL, left=1, top=1, height=1, width=1)
             wnd.sr.pic.OnClick = self.OpenPortraitWnd
             wnd.sr.pic.cursor = uiconst.UICURSOR_MAGNIFIER
@@ -651,8 +654,8 @@ class CharacterSheet(service.Service):
             th = uix.GetTextHeight(mtext)
             topParentHeight = max(220, th + const.defaultPadding * 2 + 2)
             top = max(34, wnd.sr.nameText.top + wnd.sr.nameText.height)
-            leftContainer = uiprimitives.Container(parent=wnd.sr.topParent, left=infoTextPadding, top=top, align=uiconst.TOPLEFT)
-            rightContainer = uiprimitives.Container(parent=wnd.sr.topParent, top=top, align=uiconst.TOPLEFT)
+            leftContainer = Container(parent=wnd.sr.topParent, left=infoTextPadding, top=top, align=uiconst.TOPLEFT)
+            rightContainer = Container(parent=wnd.sr.topParent, top=top, align=uiconst.TOPLEFT)
             subTop = 0
             for label, value, hint in textList:
                 label = uicontrols.EveLabelMedium(text=label, parent=leftContainer, idx=0, state=uiconst.UI_NORMAL, align=uiconst.TOPLEFT, top=subTop)
@@ -1019,9 +1022,11 @@ class CharacterSheet(service.Service):
 
     def _ReloadSkillTabs(self):
         if self.showing == 'myskills_skills':
-            self.skillTimer = base.AutoTimer(1000, self.ShowMySkills)
+            self.skillTimer = base.AutoTimer(100, self.ShowMySkills)
         elif self.showing == 'myskills_certificates':
-            self.certificateTimer = base.AutoTimer(1000, self.ShowCertificates)
+            self.certificateTimer = base.AutoTimer(100, self.ShowCertificates)
+        elif self.showing == 'myskills_skillhistory':
+            uthread.new(self.ShowMySkillHistory)
 
     def ReloadMyStandings(self):
         wnd = self.GetWnd()
@@ -1046,20 +1051,21 @@ class CharacterSheet(service.Service):
             return
 
         def GetPts(lvl):
-            return characterskills.util.GetSPForLevelRaw(stc, lvl)
+            return charskills.GetSPForLevelRaw(stc, lvl)
 
         wnd.sr.nav.DeselectAll()
         wnd.sr.scroll.sr.id = 'charsheet_skillhistory'
         wnd.sr.scroll.state = uiconst.UI_PICKCHILDREN
         rs = sm.GetService('skills').GetSkillHistory()
         scrolllist = []
-        actions = {34: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillClonePenalty'),
-         36: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingStarted'),
-         37: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
-         38: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingCanceled'),
-         39: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/GMGiveSkill'),
-         53: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
-         307: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillPointsApplied')}
+        actions = {const.skillEventClonePenalty: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillClonePenalty'),
+         const.skillEventTrainingStarted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingStarted'),
+         const.skillEventTrainingComplete: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
+         const.skillEventTrainingCancelled: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingCanceled'),
+         const.skillEventGMGive: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/GMGiveSkill'),
+         const.skillEventQueueTrainingCompleted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillTrainingComplete'),
+         const.skillEventFreeSkillPointsUsed: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillPointsApplied'),
+         const.skillEventSkillExtracted: localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/SkillLevelExtracted')}
         for r in rs:
             skill = sm.GetService('skills').GetSkill(r.skillTypeID)
             if skill:
@@ -1083,6 +1089,7 @@ class CharacterSheet(service.Service):
                 data.label += localization.formatters.FormatNumeric(level)
                 data.Set('sort_%s' % localization.GetByLabel('UI/Common/Date'), r.logDate)
                 data.id = r.skillTypeID
+                data.level = level
                 data.GetMenu = self.GetItemMenu
                 data.MenuFunction = self.GetItemMenu
                 data.OnDblClick = (self.DblClickShowInfo, data)
@@ -1462,6 +1469,8 @@ class CharacterSheet(service.Service):
                     if skill.skillLevel == 5:
                         combinedSkills.remove(skill)
 
+            if settings.user.ui.Get('charsheet_hideUntrainedSkills', False) == True:
+                combinedSkills = filter(lambda s: s.skillPoints > 0, combinedSkills)
             myFilter = wnd.quickFilter.GetValue()
             if len(myFilter):
                 combinedSkills = uiutil.NiceFilter(wnd.quickFilter.QuickFilter, combinedSkills)
@@ -1877,20 +1886,20 @@ class CharacterSheetWindow(uicontrols.Window):
         self.IsBrowser = 1
         self.GoTo = self.characterSheetSvc.GoTo
         self.HideMainIcon()
-        leftSide = uiprimitives.Container(name='leftSide', parent=self.sr.main, align=uiconst.TOLEFT, left=const.defaultPadding, width=settings.user.ui.Get('charsheetleftwidth', 200), idx=0)
+        leftSide = Container(name='leftSide', parent=self.sr.main, align=uiconst.TOLEFT, left=const.defaultPadding, width=settings.user.ui.Get('charsheetleftwidth', 200), idx=0)
         self.sr.leftSide = leftSide
         self.sr.nav = uicontrols.Scroll(name='senderlist', parent=leftSide, padTop=const.defaultPadding, padBottom=const.defaultPadding)
         self.sr.nav.OnSelectionChange = self.characterSheetSvc.OnSelectEntry
-        mainArea = uiprimitives.Container(name='mainArea', parent=self.sr.main, align=uiconst.TOALL)
-        self.sr.buttonParDeco = uiprimitives.Container(name='buttonParDeco', align=uiconst.TOBOTTOM, height=25, parent=mainArea, state=uiconst.UI_HIDDEN)
-        buttonDeco = uiprimitives.Container(name='buttonDeco', align=uiconst.TOBOTTOM, height=15, parent=self.sr.buttonParDeco, padBottom=5)
-        mainArea2 = uiprimitives.Container(name='mainArea2', parent=mainArea, align=uiconst.TOALL)
+        mainArea = Container(name='mainArea', parent=self.sr.main, align=uiconst.TOALL)
+        self.sr.buttonParDeco = Container(name='buttonParDeco', align=uiconst.TOBOTTOM, height=25, parent=mainArea, state=uiconst.UI_HIDDEN)
+        buttonDeco = Container(name='buttonDeco', align=uiconst.TOBOTTOM, height=15, parent=self.sr.buttonParDeco, padBottom=5)
+        mainArea2 = Container(name='mainArea2', parent=mainArea, align=uiconst.TOALL)
         divider = Divider(name='divider', align=uiconst.TOLEFT, width=const.defaultPadding - 1, parent=mainArea2, state=uiconst.UI_NORMAL)
         divider.Startup(leftSide, 'width', 'x', 84, 220)
         self.sr.divider = divider
-        uiprimitives.Container(name='push', parent=mainArea2, state=uiconst.UI_PICKCHILDREN, width=const.defaultPadding, align=uiconst.TORIGHT)
-        self.sr.skillpanel = uiprimitives.Container(name='skillpanel', parent=mainArea2, align=uiconst.TOTOP, state=uiconst.UI_HIDDEN, padTop=2)
-        self.sr.combatlogpanel = uiprimitives.Container(name='combatlogpanel', parent=mainArea2, align=uiconst.TOTOP, state=uiconst.UI_HIDDEN, padTop=const.defaultPadding)
+        Container(name='push', parent=mainArea2, state=uiconst.UI_PICKCHILDREN, width=const.defaultPadding, align=uiconst.TORIGHT)
+        self.sr.skillpanel = ContainerAutoSize(parent=mainArea2, align=uiconst.TOTOP, state=uiconst.UI_HIDDEN, alignMode=uiconst.TOTOP, padTop=2)
+        self.sr.combatlogpanel = Container(name='combatlogpanel', parent=mainArea2, align=uiconst.TOTOP, state=uiconst.UI_HIDDEN, padTop=const.defaultPadding)
         self.skinsPanel = CharacterSkinsPanel(parent=mainArea2, align=uiconst.TOALL, state=uiconst.UI_HIDDEN, padTop=const.defaultPadding, padBottom=const.defaultPadding)
         combatValues = ((localization.GetByLabel('UI/Corporations/Wars/Killmails/ShowKills'), 0), (localization.GetByLabel('UI/Corporations/Wars/Killmails/ShowLosses'), 1))
         selectedCombatType = settings.user.ui.Get('CombatLogCombo', 0)
@@ -1902,11 +1911,13 @@ class CharacterSheetWindow(uicontrols.Window):
         self.killReportQuickFilter = uicls.QuickFilterEdit(parent=self.sr.combatlogpanel, left=const.defaultPadding, align=uiconst.TOPRIGHT, width=150)
         self.killReportQuickFilter.ReloadFunction = self.characterSheetSvc.ReloadKillReports
         self.sr.combatlogpanel.height = self.sr.combatCombo.height + self.sr.combatSetting.height + const.defaultPadding
-        uicls.UtilMenu(menuAlign=uiconst.BOTTOMLEFT, parent=self.sr.skillpanel, align=uiconst.CENTERLEFT, GetUtilMenu=self.GetSkillSettingsMenu, texturePath='res:/UI/Texture/SettingsCogwheel.png', width=16, height=16, iconSize=18)
-        self.quickFilter = uicls.QuickFilterEdit(parent=self.sr.skillpanel, align=uiconst.CENTERLEFT, width=70, left=18)
+        if not IsSkillInjectorBannerDismissed():
+            SkillInjectorBanner(parent=self.sr.skillpanel, align=uiconst.TOTOP, padding=(4, 4, 4, 4))
+        skillFilterCont = Container(parent=self.sr.skillpanel, align=uiconst.TOTOP, height=24)
+        uicls.UtilMenu(parent=skillFilterCont, align=uiconst.CENTERLEFT, menuAlign=uiconst.BOTTOMLEFT, GetUtilMenu=self.GetSkillSettingsMenu, texturePath='res:/UI/Texture/SettingsCogwheel.png', width=16, height=16, iconSize=18)
+        self.quickFilter = uicls.QuickFilterEdit(parent=skillFilterCont, align=uiconst.CENTERLEFT, width=80, left=18)
         self.quickFilter.ReloadFunction = self.characterSheetSvc.QuickFilterReload
-        btn = uicontrols.Button(parent=self.sr.skillpanel, label=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/OpenTrainingQueue'), func=self.characterSheetSvc.OpenSkillQueueWindow, align=uiconst.CENTERRIGHT, name='characterSheetOpenTrainingQueue')
-        self.sr.skillpanel.height = max(self.quickFilter.height, btn.height)
+        btn = uicontrols.Button(parent=skillFilterCont, align=uiconst.CENTERRIGHT, label=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/OpenTrainingQueue'), func=self.characterSheetSvc.OpenSkillQueueWindow, name='characterSheetOpenTrainingQueue')
         btns = [(localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/DecoTabs/SaveDecorationPermissionChanges'),
           self.characterSheetSvc.SaveDecorationPermissionsChanges,
           (),
@@ -1925,11 +1936,11 @@ class CharacterSheetWindow(uicontrols.Window):
         self.sr.decoRankList = None
         self.sr.decoMedalList = None
         self.sr.mainArea = mainArea
-        self.sr.bioparent = uiprimitives.Container(name='bio', parent=mainArea2, state=uiconst.UI_HIDDEN, padding=(0,
+        self.sr.bioparent = Container(name='bio', parent=mainArea2, state=uiconst.UI_HIDDEN, padding=(0,
          const.defaultPadding,
          0,
          const.defaultPadding))
-        self.sr.plexContainer = uiprimitives.Container(name='plex', parent=mainArea2, state=uiconst.UI_HIDDEN, padding=(0,
+        self.sr.plexContainer = Container(name='plex', parent=mainArea2, state=uiconst.UI_HIDDEN, padding=(0,
          const.defaultPadding,
          0,
          const.defaultPadding))
@@ -1955,12 +1966,12 @@ class CharacterSheetWindow(uicontrols.Window):
 
     @telemetry.ZONE_METHOD
     def _CheckShowT3ShipLossMessage(self):
-        recentT3ShipLoss = settings.char.generic.Get('skillLossNotification', None)
-        if recentT3ShipLoss is not None:
-            eve.Message('RecentSkillLossDueToT3Ship', {'skillTypeID': (const.UE_TYPEID, recentT3ShipLoss.skillTypeID),
-             'skillPoints': recentT3ShipLoss.skillPoints,
-             'shipTypeID': (const.UE_TYPEID, recentT3ShipLoss.shipTypeID)})
-            settings.char.generic.Set('skillLossNotification', None)
+        lossMessages = sm.StartService('skills').GetRecentLossMessages()
+        for messageTuple in lossMessages:
+            messageType, messageDict = messageTuple
+            eve.Message(messageType, messageDict)
+
+        if len(lossMessages):
             sm.GetService('skills').ResetSkillHistory()
 
     def Close(self, *args, **kwds):
@@ -1981,6 +1992,7 @@ class CharacterSheetWindow(uicontrols.Window):
         menuParent.AddCheckBox(text=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/HighlightPartiallyTrainedSkills'), checked=settings.user.ui.Get('charsheet_hilitePartiallyTrainedSkills', False), callback=self.ToggleHighlightPartiallyTrainedSkills)
         menuParent.AddCheckBox(text=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/ToggleOneSkillGroupAtATime'), checked=settings.user.ui.Get('charsheet_toggleOneSkillGroupAtATime', False), callback=self.ToggleOneSkillGroup)
         menuParent.AddCheckBox(text=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/HideLvl5'), checked=settings.user.ui.Get('charsheet_hideLevel5Skills', False), callback=self.ToggleHideLevel5Skills)
+        menuParent.AddCheckBox(text=localization.GetByLabel('UI/CharacterSheet/CharacterSheetWindow/SkillTabs/HideUntrained'), checked=settings.user.ui.Get('charsheet_hideUntrainedSkills', False), callback=self.ToggleHideUntrainedSkills)
 
     def SetShowSkillsTrained(self):
         settings.user.ui.Set('charsheet_showSkills', 'trained')
@@ -2000,18 +2012,18 @@ class CharacterSheetWindow(uicontrols.Window):
         sm.GetService('charactersheet').ShowMySkills()
 
     def ToggleOneSkillGroup(self):
-        current = settings.user.ui.Get('charsheet_toggleOneSkillGroupAtATime', True)
+        current = settings.user.ui.Get('charsheet_toggleOneSkillGroupAtATime', False)
         settings.user.ui.Set('charsheet_toggleOneSkillGroupAtATime', not current)
         sm.GetService('charactersheet').ShowMySkills()
 
     def ToggleHideLevel5Skills(self):
-        current = settings.user.ui.Get('charsheet_hideLevel5Skills', True)
+        current = settings.user.ui.Get('charsheet_hideLevel5Skills', False)
         settings.user.ui.Set('charsheet_hideLevel5Skills', not current)
         sm.GetService('charactersheet').ShowMySkills()
 
-    def ToggleHideLevel5Skills(self):
-        current = settings.user.ui.Get('charsheet_hideLevel5Skills', True)
-        settings.user.ui.Set('charsheet_hideLevel5Skills', not current)
+    def ToggleHideUntrainedSkills(self):
+        current = settings.user.ui.Get('charsheet_hideUntrainedSkills', False)
+        settings.user.ui.Set('charsheet_hideUntrainedSkills', not current)
         sm.GetService('charactersheet').ShowMySkills()
 
     def GetSkillCertSettingsMenu(self, menuParent):

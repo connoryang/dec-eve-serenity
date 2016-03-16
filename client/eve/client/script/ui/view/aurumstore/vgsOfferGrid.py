@@ -3,8 +3,8 @@ from carbonui.primitives.flowcontainer import FlowContainer
 from eve.client.script.ui.view.aurumstore.vgsHelper import FormatAUR
 from eve.client.script.ui.view.aurumstore.vgsOffer import VgsOffer
 from eve.client.script.ui.view.aurumstore.vgsUiConst import CONTENT_PADDING, OFFER_COLUMNS
-from fsdlite.signal import Signal
 import carbonui.const as uiconst
+import signals
 MAX_OFFER_IMAGE_SIZE = 512
 
 def UpdateCellSize(offer, cellWidth):
@@ -20,7 +20,7 @@ class OfferGrid(FlowContainer):
         self.offers = []
         self.index = 0
         self.incrementSize = incrementSize
-        self.onUpdate = Signal()
+        self.onUpdate = signals.Signal()
 
     def SetOffers(self, offers):
         self.Flush()

@@ -27,6 +27,7 @@ from eve.client.script.environment.invControllers import ShipAmmoHold
 from eve.client.script.environment.invControllers import ShipCargo
 from eve.client.script.environment.invControllers import ShipCommandCenterHold
 from eve.client.script.environment.invControllers import ShipDroneBay
+from eve.client.script.environment.invControllers import ShipFighterBay
 from eve.client.script.environment.invControllers import ShipFleetHangar
 from eve.client.script.environment.invControllers import ShipFuelBay
 from eve.client.script.environment.invControllers import ShipGasHold

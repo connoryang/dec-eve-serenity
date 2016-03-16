@@ -245,15 +245,16 @@ class ScrollColumnHeader(Container):
         if self.scroll and self.entryClass:
             columnWidths = self.GetColumnWidths()
             for node in self.scroll.GetNodes():
+                node.columnWidths = columnWidths
                 if node.panel:
                     node.panel.OnColumnResize(columnWidths)
-                else:
-                    node.columnWidths = columnWidths
 
     def OnColumnSizeReset(self, columnID):
         if self.scroll and self.entryClass:
-            if self.minSizeByColumnID:
-                minSize = self.minSizeByColumnID.get(columnID, COLUMNMINSIZE)
+            minSize = self.minSizeByColumnID.get(columnID, COLUMNMINSIZE)
+            defaultSizes = self.entryClass.GetColumnsDefaultSize()
+            if defaultSizes:
+                resetSize = defaultSizes.get(columnID, minSize)
             else:
-                minSize = COLUMNMINSIZE
-            self.SetColumnSize(columnID, minSize)
+                resetSize = minSize
+            self.SetColumnSize(columnID, resetSize)

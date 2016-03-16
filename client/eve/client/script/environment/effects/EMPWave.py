@@ -2,8 +2,11 @@
 from eve.client.script.environment.effects.GenericEffect import GenericEffect, STOP_REASON_DEFAULT, STOP_REASON_BALL_REMOVED
 import trinity
 import audio2
+import uthread
 import util
 import evetypes
+import blue
+import geo2
 
 class EMPWave(GenericEffect):
     __guid__ = 'effects.EMPWave'
@@ -16,6 +19,8 @@ class EMPWave(GenericEffect):
         self.radius = 5000.0
         self.moduleTypeID = trigger.moduleTypeID
         self.translationCurve = None
+        self.trigger = trigger
+        self.ballpark = sm.GetService('michelle').GetBallpark()
 
     def Stop(self, reason = STOP_REASON_DEFAULT):
         if self.gfx is None:
@@ -69,6 +74,29 @@ class EMPWave(GenericEffect):
                 scaleValue = length / (duration / 1000.0)
                 self.gfxModel.curveSets[0].scale = scaleValue
         self.gfx.curveSets[0].Play()
+        self.ApplyImpactEffectToTargets()
+
+    def ApplyImpactEffectToTargets(self):
+        sourceBall = sm.GetService('michelle').GetBall(self.ballIDs[0])
+        for targetId in self.trigger.graphicInfo:
+            targetBall = sm.GetService('michelle').GetBall(targetId)
+            uthread.new(self.ApplyImpactEffectToSingleTarget, sourceBall, targetBall)
+
+    def ApplyImpactEffectToSingleTarget(self, sourceBall, targetBall):
+        if targetBall is None or targetBall.model is None:
+            return
+        distance = self.ballpark.DistanceBetween(targetBall.id, sourceBall.id)
+        if distance > self.radius:
+            return
+        timeUntilImpact = 500 * distance / self.radius
+        blue.synchro.SleepSim(timeUntilImpact)
+        if targetBall is None or targetBall.model is None:
+            return
+        source = sourceBall.GetVectorAt(blue.os.GetSimTime())
+        target = targetBall.GetVectorAt(blue.os.GetSimTime())
+        direction = source - target
+        direction.Normalize()
+        targetBall.model.CreateImpactFromPosition((source.x, source.y, source.z), (direction.x, direction.y, direction.z), 1, 1)
 
     def Repeat(self, duration):
         if self.gfx is None:
@@ -78,3 +106,4 @@ class EMPWave(GenericEffect):
         if shipBall is None:
             self.Stop(STOP_REASON_BALL_REMOVED)
         self.gfx.curveSets[0].Play()
+        self.ApplyImpactEffectToTargets()

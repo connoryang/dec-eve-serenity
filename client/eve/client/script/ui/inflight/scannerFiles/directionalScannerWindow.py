@@ -10,7 +10,7 @@ from carbonui.control.singlelineedit import SinglelineEditCore
 from carbonui.primitives.flowcontainer import FlowContainer
 from carbonui.primitives.layoutGrid import LayoutGrid
 from carbonui.util.various_unsorted import SortListOfTuples
-from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive
+from eve.client.script.ui.camera.cameraUtil import IsNewCameraActive, GetBallPosition, GetBall
 from eve.client.script.ui.control.primaryButton import PrimaryButton
 from eve.client.script.ui.control.themeColored import FillThemeColored, LineThemeColored
 from eve.client.script.ui.control.tooltips import ShortcutHint
@@ -49,8 +49,10 @@ MIN_WINDOW_WIDTH = 320
 MIN_WINDOW_HEIGHT = 200
 RANGEMODE_AU = 1
 RANGEMODE_KM = 2
+MIN_RANGE_KM = 10
+MIN_RANGE_AU = ConvertKmToAu(MIN_RANGE_KM)
 MAX_RANGE_AU = 14.3
-MIN_RANGE_AU = 0.001
+MAX_RANGE_KM = ConvertAuToKm(MAX_RANGE_AU)
 
 class DirectionalScanner(Window):
     __notifyevents__ = ['OnOverviewPresetSaved', 'OnBallparkSetState']
@@ -59,16 +61,18 @@ class DirectionalScanner(Window):
     default_height = 350
     default_minSize = (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
     default_captionLabelPath = 'UI/Inflight/Scanner/DirectionalScan'
-    dScanDirty = True
+    dScanDirty = False
     filteredBoxTooltip = None
 
     def ApplyAttributes(self, attributes):
         Window.ApplyAttributes(self, attributes)
+        scanOnOpen = attributes.Get('scanOnOpen', True)
         self.scanSvc = sm.GetService('scanSvc')
         self.busy = False
         self.scanresult = []
         self.scanangle = DegToRad(90)
         self.rangeEditMode = settings.user.ui.Get('scanner_rangeEditMode', RANGEMODE_AU)
+        self.hasAnalyzeExecutedDuringKeyPress = None
         self.scope = 'inflight'
         self.SetTopparentHeight(0)
         self.SetWndIcon(None)
@@ -79,7 +83,16 @@ class DirectionalScanner(Window):
         if solarSystemView:
             solarSystemView.StartDirectionalScanHandler()
         self.keyUpCookie = uicore.event.RegisterForTriuiEvents(uiconst.UI_KEYUP, self.OnGlobalKeyUpCallback)
-        uthread.new(self.Analyze)
+        if scanOnOpen:
+            self.Analyze()
+
+    def OnCmdDirectionalScanUnload(self, cmdWasExecuted):
+        if not cmdWasExecuted:
+            self.Analyze()
+        self.hasAnalyzeExecutedDuringKeyPress = None
+
+    def OnCmdDirectionalScanLoad(self):
+        self.hasAnalyzeExecutedDuringKeyPress = False
 
     def Close(self, *args, **kwds):
         solarSystemView = self.GetSolarSystemView()
@@ -90,7 +103,7 @@ class DirectionalScanner(Window):
 
     def Confirm(self, *args):
         if not self.analyzeButton.disabled:
-            uthread.new(self.Analyze)
+            self.Analyze()
 
     def OnGlobalKeyUpCallback(self, wnd, eventID, (vkey, flag), *args):
         if self.destroyed:
@@ -141,7 +154,7 @@ class DirectionalScanner(Window):
             return solarSystemView.GetDirectionalScanHandler()
 
     def SetupDScanUI(self, directionBox):
-        self.analyzeButton = PrimaryButton(label=GetByLabel('UI/Inflight/Scanner/Scan'), func=self.Analyze, parent=directionBox)
+        self.analyzeButton = AnalyzeButton(label=GetByLabel('UI/Inflight/Scanner/Scan'), func=self.OnAnalyzeButton, parent=directionBox)
         mapButton = BigButton(parent=directionBox, width=32, height=32, hint=GetByLabel('UI/Map/MapPallet/btnSolarsystemMap'), align=uiconst.TOPRIGHT)
         mapButton.Startup(32, 32)
         mapButton.sr.icon.SetTexturePath('res:/UI/Texture/classes/ProbeScanner/solarsystemMapButton.png')
@@ -154,8 +167,7 @@ class DirectionalScanner(Window):
          0), align=uiconst.TOTOP, contentSpacing=(4, 2))
         startingKmValue = settings.user.ui.Get('dir_scanrange', const.AU * MAX_RANGE_AU)
         startingAuValue = ConvertKmToAu(startingKmValue)
-        smallestAU = MIN_RANGE_AU
-        self.distanceSlider = Slider(name='distanceSlider', parent=flowContainer, sliderID='distanceSlider', minValue=0, maxValue=MAX_RANGE_AU, endsliderfunc=self.EndSetDistanceSliderValue, onsetvaluefunc=self.OnSetDistanceSliderValue, increments=[smallestAU,
+        self.distanceSlider = Slider(name='distanceSlider', parent=flowContainer, sliderID='distanceSlider', minValue=0, maxValue=MAX_RANGE_AU, endsliderfunc=self.EndSetDistanceSliderValue, onsetvaluefunc=self.OnSetDistanceSliderValue, increments=[MIN_RANGE_AU,
          1,
          5,
          10,
@@ -164,10 +176,12 @@ class DirectionalScanner(Window):
         self.distanceSlider.SetValue(startingAuValue, updateHandle=True, useIncrements=False)
         subGrid = LayoutGrid(columns=2, align=uiconst.NOALIGN)
         maxAuRangeInKm = ConvertAuToKm(MAX_RANGE_AU)
-        self.dir_rangeinput = SinglelineEdit(name='dir_rangeinput', parent=subGrid, align=uiconst.CENTERLEFT, width=90, top=0, maxLength=len(str(maxAuRangeInKm)) + 1, OnReturn=self.Analyze)
+        self.dir_rangeinput = SinglelineEdit(name='dir_rangeinput', parent=subGrid, align=uiconst.CENTERLEFT, width=90, top=0, maxLength=len(str(maxAuRangeInKm)) + 1, OnReturn=self.OnAnalyzeButton)
         self.unitToggleButton = Button(parent=subGrid, align=uiconst.CENTERLEFT, func=self.ToggleRangeUnits, left=4)
         flowContainer.children.append(subGrid)
         startingKmValue = settings.user.ui.Get('dir_scanrange', const.AU * MAX_RANGE_AU)
+        startingKmValue = min(MAX_RANGE_KM, max(MIN_RANGE_KM, startingKmValue))
+        self.scanRangeKM = startingKmValue
         self.UpdateRangeInput(startingKmValue)
         self.dir_rangeinput.OnChar = self.OnCharRangeInput
         self.dir_rangeinput.OnMouseWheel = self.OnMouseWheelRangeInput
@@ -201,6 +215,7 @@ class DirectionalScanner(Window):
         self.headerParent.height = max(20, self.headerLabel.textheight + 2)
         self.sr.dirscroll = Scroll(name='dirscroll', parent=directionBox)
         self.sr.dirscroll.sr.id = 'scanner_dirscroll'
+        self.sr.dirscroll.OnChar = None
         self.filteredBox = FilterBox(parent=self.headerParent, text='-', state=uiconst.UI_NORMAL, align=uiconst.CENTERRIGHT)
         self.filteredBox.LoadTooltipPanel = self.LoadFilterTooltipPanel
 
@@ -251,7 +266,7 @@ class DirectionalScanner(Window):
         if self.scanresult:
             uthread.new(self.ShowDirectionalSearchResult)
         else:
-            uthread.new(self.Analyze)
+            self.Analyze()
         self.ReloadFilteredBoxTooltip()
 
     def ReloadFilteredBoxTooltip(self):
@@ -263,8 +278,9 @@ class DirectionalScanner(Window):
 
     def UpdateRangeInput(self, scanRangeKM):
         if self.rangeEditMode == RANGEMODE_AU:
-            self.dir_rangeinput.FloatMode(minfloat=MIN_RANGE_AU, maxfloat=MAX_RANGE_AU, digits=3)
-            self.dir_rangeinput.SetValue(ConvertKmToAu(scanRangeKM))
+            scanRangeAU = ConvertKmToAu(scanRangeKM)
+            self.dir_rangeinput.FloatMode(minfloat=MIN_RANGE_AU, maxfloat=MAX_RANGE_AU, digits=1)
+            self.dir_rangeinput.SetValue(scanRangeAU)
             self.unitToggleButton.SetLabel(GetByLabel('UI/Inflight/Scanner/UnitAU'))
         else:
             self.dir_rangeinput.IntMode(minint=ConvertAuToKm(MIN_RANGE_AU), maxint=ConvertAuToKm(MAX_RANGE_AU))
@@ -273,13 +289,11 @@ class DirectionalScanner(Window):
 
     def ToggleRangeUnits(self, *args):
         if self.rangeEditMode == RANGEMODE_AU:
-            scanRange = self.dir_rangeinput.GetValue()
-            scanRangeKM = ConvertAuToKm(scanRange)
             self.rangeEditMode = RANGEMODE_KM
         else:
-            scanRangeKM = self.dir_rangeinput.GetValue()
             self.rangeEditMode = RANGEMODE_AU
-        self.UpdateRangeInput(scanRangeKM)
+        settings.user.ui.Set('scanner_rangeEditMode', self.rangeEditMode)
+        self.UpdateRangeInput(self.scanRangeKM)
 
     def GetPresetOptions(self):
         p = sm.GetService('overviewPresetSvc').GetAllPresets().keys()
@@ -297,16 +311,25 @@ class DirectionalScanner(Window):
         return options
 
     def ScanTowardsItem(self, itemID, mapPosition = None):
+        if self.busy:
+            return
+        ball = GetBall(itemID)
+        if not ball:
+            return
+        uthread.new(self._Analyze, GetBallPosition(ball))
         directionalScanHandler = self.GetDirectionalScanHandler()
         if directionalScanHandler:
-            directionalScanHandler.SetScanTarget(itemID, mapPosition, callback=self.OnScanConeAligned)
+            directionalScanHandler.SetScanTarget(itemID, mapPosition)
+        else:
+            camera = sm.GetService('sceneManager').GetActiveSpaceCamera()
+            camera.Track(itemID)
 
     def OnScanConeAligned(self):
-        uthread.new(self.Analyze)
+        self.Analyze()
 
     def OnBallparkSetState(self):
         if not self.destroyed:
-            uthread.new(self.Analyze)
+            self.Analyze()
 
     def OnOverviewPresetSaved(self):
         uthread.new(self.ShowDirectionalSearchResult)
@@ -332,28 +355,30 @@ class DirectionalScanner(Window):
         scanRange = self.dir_rangeinput.GetValue()
         if self.rangeEditMode == RANGEMODE_KM:
             scanRangeAU = ConvertKmToAu(scanRange)
+            self.scanRangeKM = scanRange
         else:
             scanRangeAU = scanRange
-            scanRange = ConvertAuToKm(scanRange)
+            self.scanRangeKM = max(MIN_RANGE_KM, ConvertAuToKm(scanRange))
         self.distanceSlider.SetValue(scanRangeAU, updateHandle=True, useIncrements=False)
-        sm.ScatterEvent('OnDirectionalScannerRangeChanged', scanRange * 1000)
-        uthread.new(self.Analyze)
+        sm.ScatterEvent('OnDirectionalScannerRangeChanged', self.scanRangeKM * 1000)
+        self.Analyze()
 
     def UpdateDistanceFromSlider(self):
-        auValue = self.distanceSlider.GetValue()
-        kmValue = ConvertAuToKm(auValue)
+        scanRangeAU = self.distanceSlider.GetValue()
+        kmValue = ConvertAuToKm(scanRangeAU)
         if self.rangeEditMode == RANGEMODE_KM:
             self.dir_rangeinput.SetValue(kmValue)
         else:
-            self.dir_rangeinput.SetValue(auValue)
+            self.dir_rangeinput.SetValue(scanRangeAU)
 
     def EndSetDistanceSliderValue(self, *args):
         self.UpdateDistanceFromSlider()
         scanRange = self.dir_rangeinput.GetValue()
         if self.rangeEditMode == RANGEMODE_AU:
             scanRange = ConvertAuToKm(scanRange)
-        sm.ScatterEvent('OnDirectionalScannerRangeChanged', scanRange * 1000)
-        uthread.new(self.Analyze)
+        self.scanRangeKM = max(MIN_RANGE_KM, scanRange)
+        sm.ScatterEvent('OnDirectionalScannerRangeChanged', self.scanRangeKM * 1000)
+        self.Analyze()
 
     def OnSetDistanceSliderValue(self, slider, *args):
         if not slider.dragging:
@@ -365,9 +390,17 @@ class DirectionalScanner(Window):
         self.SetMapAngle(DegToRad(angleValue))
         settings.user.ui.Set('scan_angleSlider', angleValue)
         sm.ScatterEvent('OnDirectionalScannerAngleChanged', self.scanangle)
-        uthread.new(self.Analyze)
+        self.Analyze()
 
-    def Analyze(self, *args):
+    def OnAnalyzeButton(self, *args):
+        self.Analyze()
+
+    def Analyze(self, direction = None):
+        uthread.new(self._Analyze, direction)
+
+    def _Analyze(self, direction = None, *args):
+        if self.hasAnalyzeExecutedDuringKeyPress is not None:
+            self.hasAnalyzeExecutedDuringKeyPress = True
         if self.destroyed:
             return
         if self.busy:
@@ -375,34 +408,29 @@ class DirectionalScanner(Window):
             return
         self.busy = True
         self.analyzeButton.AnimateArrows()
+        self.analyzeButton.Disable()
         try:
-            self._DirectionSearch()
+            self._DirectionSearch(direction)
         finally:
             self.analyzeButton.StopAnimateArrows()
             self.busy = False
+            self.analyzeButton.Enable()
 
         if self.dScanDirty:
             self.dScanDirty = False
-            uthread.new(self.Analyze)
+            self.Analyze()
 
-    def _DirectionSearch(self, *args, **kwds):
+    def _DirectionSearch(self, direction = None, *args, **kwds):
         self.scanresult = []
         spaceCamera = sm.GetService('sceneManager').GetActiveSpaceCamera()
         if not spaceCamera:
             return
         updateStartTime = blue.os.GetWallclockTimeNow()
-        if IsNewCameraActive():
-            viewVector = spaceCamera.GetViewVector()
-        else:
-            spaceCameraRotation = geo2.QuaternionRotationSetYawPitchRoll(spaceCamera.yaw, spaceCamera.pitch, 0.0)
-            viewVector = geo2.QuaternionTransformVector(spaceCameraRotation, (0, 0, 1))
-        scanVector = geo2.Vec3Negate(viewVector)
-        scanRange = self.dir_rangeinput.GetValue()
-        if self.rangeEditMode == RANGEMODE_AU:
-            scanRange = ConvertAuToKm(scanRange)
-        settings.user.ui.Set('dir_scanrange', scanRange)
+        if not direction:
+            direction = self.GetScanDirection(spaceCamera)
+        settings.user.ui.Set('dir_scanrange', self.scanRangeKM)
         try:
-            result = self.scanSvc.ConeScan(self.scanangle, (scanRange * 1000), *scanVector)
+            result = self.scanSvc.ConeScan(self.scanangle, (self.scanRangeKM * 1000), *direction)
         except (UserError, RuntimeError) as err:
             raise err
 
@@ -414,6 +442,15 @@ class DirectionalScanner(Window):
         diff = blue.os.TimeDiffInMs(updateStartTime, blue.os.GetWallclockTimeNow())
         sleep = max(1, 1500 - diff)
         blue.pyos.synchro.SleepWallclock(sleep)
+
+    def GetScanDirection(self, spaceCamera):
+        if IsNewCameraActive():
+            direction = spaceCamera.GetViewVector()
+        else:
+            spaceCameraRotation = geo2.QuaternionRotationSetYawPitchRoll(spaceCamera.yaw, spaceCamera.pitch, 0.0)
+            direction = geo2.QuaternionTransformVector(spaceCameraRotation, (0, 0, 1))
+        direction = geo2.Vec3Negate(direction)
+        return direction
 
     def ShowDirectionalSearchResult(self, *args):
         selectedValue = settings.user.ui.Get('scanner_presetInUse', None)
@@ -498,7 +535,7 @@ class DirectionalScanner(Window):
             wnd.SetTempAngle(angle)
 
     def EndSetSliderValue(self, *args):
-        uthread.new(self.Analyze)
+        self.Analyze()
 
 
 class DirectionalScanResults(listentry.Generic):
@@ -516,3 +553,15 @@ class FilterOptionEntry(MapViewCheckbox):
         if self.sr.node.filterIndex is not None:
             shortcutObj = ShortcutHint(parent=self, text=str(self.sr.node.filterIndex), left=2, top=2)
             self.TEXTRIGHT = shortcutObj.width + 4
+
+
+class AnalyzeButton(PrimaryButton):
+
+    def StopAnimateArrows(self):
+        PrimaryButton.StopAnimateArrows(self)
+        uicore.animations.BlinkIn(self.underlay, loops=2)
+
+    def LoadTooltipPanel(self, tooltipPanel, *args):
+        tooltipPanel.LoadGeneric2ColumnTemplate()
+        cmd = uicore.cmd.commandMap.GetCommandByName('CmdRefreshDirectionalScan')
+        tooltipPanel.AddCommandTooltip(cmd)

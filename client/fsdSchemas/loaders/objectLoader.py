@@ -1,4 +1,4 @@
-#Embedded file name: F:\depot\streams\olafurth_olafurth-pc_STABLE_2754\fsdSchemas\loaders\objectLoader.py
+#Embedded file name: C:\jamieb_jamieb-pc_STABLE_1796\fsdSchemas\loaders\objectLoader.py
 import ctypes
 import array
 import cStringIO
@@ -19,12 +19,12 @@ class ObjectLoader(object):
             __offsetAttributes__ = schema['attributesWithVariableOffsets'][:]
             if self.__schema__['optionalValueLookups']:
                 self.__hasOptionalAttributes__ = True
-                optionalAttributesField = structTypes.uint32.unpack_from(data, offset + schema['endOfFixedSizeData'])[0]
+                optionalAttributesField = structTypes.uint64.unpack_from(data, offset + schema['endOfFixedSizeData'])[0]
                 for attr, i in schema['optionalValueLookups'].iteritems():
                     if not optionalAttributesField & i:
                         __offsetAttributes__.remove(attr)
 
-            offsetAttributeArrayStart = offset + schema.get('endOfFixedSizeData', 0) + 4
+            offsetAttributeArrayStart = offset + schema.get('endOfFixedSizeData', 0) + 8
             offsetAttributeOffsetsType = ctypes.c_uint32 * len(__offsetAttributes__)
             self.__variableDataOffsetBase__ = offsetAttributeArrayStart + ctypes.sizeof(offsetAttributeOffsetsType)
             offsetData = data[offsetAttributeArrayStart:offsetAttributeArrayStart + ctypes.sizeof(offsetAttributeOffsetsType)]

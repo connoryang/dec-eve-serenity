@@ -94,13 +94,15 @@ class MapViewMarkersHandler(object):
     def UpdateMarkers(self):
         distance_markers = []
         stack_markers = []
-        for markerID in self.distanceSortedMarkers:
+        activeAndHighlighted = self.hilightMarkers.union(self.activeMarkers)
+        for markerID in activeAndHighlighted.union(self.distanceSortedMarkers):
             markerObject = self.projectBrackets.get(markerID, None)
             if markerObject and markerObject.markerContainer and not markerObject.markerContainer.destroyed:
                 markerDistance = markerObject.GetCameraDistance()
                 distance_markers.append((markerDistance, markerObject))
-                markerBoundaries = markerObject.GetBoundaries()
-                stack_markers.append(((markerObject.GetOverlapSortValue(), markerDistance), (markerBoundaries, markerObject)))
+                if hasattr(markerObject, 'GetOverlapSortValue'):
+                    markerBoundaries = markerObject.GetBoundaries()
+                    stack_markers.append(((markerObject.GetOverlapSortValue(), markerDistance), (markerBoundaries, markerObject)))
 
         distanceSortedMarkers = sorted(distance_markers, reverse=True)
         for markerDistance, markerObject in distanceSortedMarkers:
@@ -117,9 +119,6 @@ class MapViewMarkersHandler(object):
                     markerObject.SetOverlappedState(True)
                 else:
                     markerObject.SetOverlappedState(False)
-
-        for marker in self.GetActiveAndHilightedMarkers():
-            marker.MoveToFront()
 
     def GetExtraMouseOverInfoForMarker(self, markerID):
         if self.mapView:
@@ -166,20 +165,24 @@ class MapViewMarkersHandler(object):
     def OnMarkerSelected(self, marker, zoomTo = False):
         self.mapView.SetActiveMarker(marker, zoomToItem=zoomTo)
 
-    def HilightMarkers(self, markerIDs):
+    def HilightMarkers(self, markerIDs, add = False):
         hilightMarkers = markerIDs
-        for oldMarkerID in self.hilightMarkers:
-            if oldMarkerID not in hilightMarkers:
-                oldMarker = self.GetMarkerByID(oldMarkerID)
-                if oldMarker:
-                    oldMarker.SetHilightState(False)
+        if not add:
+            for oldMarkerID in self.hilightMarkers:
+                if oldMarkerID not in hilightMarkers:
+                    oldMarker = self.GetMarkerByID(oldMarkerID)
+                    if oldMarker:
+                        oldMarker.SetHilightState(False)
 
         for newMarkerID in hilightMarkers:
             newMarker = self.GetMarkerByID(newMarkerID)
             if newMarker:
                 newMarker.SetHilightState(True)
 
-        self.hilightMarkers = set(hilightMarkers)
+        if add:
+            self.hilightMarkers = self.hilightMarkers.union(set(hilightMarkers))
+        else:
+            self.hilightMarkers = set(hilightMarkers)
 
     def ActivateMarkers(self, markerIDs):
         activeMarkers = markerIDs
@@ -209,7 +212,7 @@ class MapViewMarkersHandler(object):
 
         return ret
 
-    def IsActiveOfHilighted(self, markerID):
+    def IsActiveOrHilighted(self, markerID):
         return markerID in self.activeMarkers or markerID in self.hilightMarkers
 
     def RemoveMarker(self, markerID, fadeOut = False):

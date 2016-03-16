@@ -50,7 +50,7 @@ class t3ShipSvc(service.Service):
         t = subSystems.values()
         t.sort()
         uniqueComboID = '_'.join([ str(id) for id in t ])
-        cacheVersion = 'v6'
+        cacheVersion = 'v7'
         blackFileCachePath = 'cache:/ships/%s_%s_%s.black' % (cacheVersion, shipTypeID, uniqueComboID)
         gr2FileCachePath = 'cache:/ships/%s_%s_%s.gr2' % (cacheVersion, shipTypeID, uniqueComboID)
         lockFileCachePath = 'cache:/ships/%s_%s_%s.lock' % (cacheVersion, shipTypeID, uniqueComboID)

@@ -120,6 +120,10 @@ class Gauge(_GaugeBase):
                 self.AnimFlash(value - self.value, timeOffset=timeOffset)
             self._SetValue(self.gauge, value, frequency, animate)
 
+    def SetValueTimed(self, value, duration, callback = None):
+        uicore.animations.MorphScalar(self.gauge, 'width', self.value, value, duration=duration, curveType=uiconst.ANIM_LINEAR, callback=callback)
+        self.value = self.gauge.width
+
     def SetValueText(self, text):
         if getattr(self, 'valueText', None) is None:
             self.valueText = uicontrols.EveLabelSmall(parent=self.gaugeCont, align=uiconst.CENTER, state=uiconst.UI_DISABLED, idx=0)

@@ -19,6 +19,7 @@ import sys
 import _weakref
 import log
 import carbonui.const as uiconst
+from carbonui.fontconst import DEFAULT_FONTSIZE, DEFAULT_LETTERSPACE, DEFAULT_UPPERCASE
 import weakref
 import localization
 SCROLLMARGIN = 0
@@ -1376,7 +1377,15 @@ class ScrollCore(Container):
         if enteredChar < 32:
             return False
         if not self.sr.nodes:
-            return True
+            return False
+        haveCharIndex = False
+        for node in self.sr.nodes:
+            if node.charIndex is not None:
+                haveCharIndex = True
+                break
+
+        if not haveCharIndex:
+            return False
         if blue.os.TimeAsDouble(blue.os.GetWallclockTime()) - self.lastCharReceivedAt < 1.0 and self.currChars is not None:
             self.currChars += unichr(enteredChar).lower()
         else:
@@ -1616,6 +1625,24 @@ class ScrollCore(Container):
 
     def GetMinSize(self):
         return (64, 64)
+
+    def GetMaxTextWidth(self, defaultTextWidth = 0):
+        nodes = self.GetNodes()
+        if not nodes:
+            return defaultTextWidth
+        textWidths = []
+        for node in nodes:
+            fontsize = node.Get('fontsize', DEFAULT_FONTSIZE)
+            hspace = node.Get('letterspace', DEFAULT_LETTERSPACE)
+            uppercase = node.Get('uppercase', DEFAULT_UPPERCASE)
+            textWidth = uicore.font.GetTextWidth(node.label, fontsize, hspace, uppercase)
+            padLeft = node.Get('padLeft', TABMARGIN)
+            padRight = node.Get('padRight', TABMARGIN)
+            padIndentation = uiconst.ENTRY_DEFAULT_ICONSIZE * (1 + node.get('sublevel', 0))
+            textWidth += padIndentation + padLeft + padRight
+            textWidths.append(textWidth)
+
+        return max(textWidths)
 
     def GetNoItemNode(self, text, sublevel = 0, *args):
         from carbonui.control.scrollentries import ScrollEntryNode

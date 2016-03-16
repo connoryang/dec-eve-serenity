@@ -545,6 +545,10 @@ class TournamentRefereeTool(uicontrols.Window):
             return
         self.matchMoniker.OverrideError(self.matchDetails[0], charID, errorString)
 
+    def OverrideAllErrors(self, teamIdx, charID, errorStrings):
+        for error in errorStrings:
+            self.OverrideError(teamIdx, charID, error)
+
     def RemovePlayer(self, teamIdx, charID):
         ret = eve.Message('CustomQuestion', {'header': "JUST CHECKIN'",
          'question': 'Remove %s from their team?' % cfg.eveowners.Get(charID).ownerName}, uiconst.YESNO)
@@ -562,6 +566,7 @@ class TournamentRefereeTool(uicontrols.Window):
             errorMenu.append(None)
         errorMenu.append(('Remove Player', self.RemovePlayer, (node.sr.node.id[0], node.sr.node.id[1])))
         errorMenu.append(None)
+        errorMenu.append(('Override all errors (!!!)', self.OverrideAllErrors, (node.sr.node.id[0], node.sr.node.id[1], node.sr.node.errors)))
         return errorMenu + basePilotMenu
 
     def UpdateShipPilotDisplay(self):
@@ -743,7 +748,6 @@ class TournamentRefereeTool(uicontrols.Window):
 
 class RefWindowSpawningWindow(uicontrols.Window):
     __guid__ = 'form.RefWindowSpawningWindow'
-    __neocommenuitem__ = (('Referee Tool Root', 'tournament'), True, service.ROLE_GML)
     default_windowID = 'tournament'
 
     def ApplyAttributes(self, attributes):
@@ -769,7 +773,7 @@ class RefWindowSpawningWindow(uicontrols.Window):
 
 class AllianceTournamentSvc(service.Service):
     __guid__ = 'svc.allianceTournamentSvc'
-    __neocommenuitem__ = (('Tournament Refree Tool', None), 'Show', service.ROLE_GML)
+    __neocommenuitem__ = (('Tournament Referee Tool', None), 'Show', service.ROLE_GML)
     __dependencies__ = ['michelle']
 
     def Run(self, *args):

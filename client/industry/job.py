@@ -2,7 +2,7 @@
 import math
 import copy
 import random
-import fsdlite
+import signals
 import industry
 import datetime
 import operator
@@ -33,14 +33,14 @@ class JobBase(industry.Base):
         obj.request = {}
         obj.prices = {}
         obj._modifiers_cache = None
-        obj.on_validate = fsdlite.Signal()
-        obj.on_updated = fsdlite.Signal()
-        obj.on_errors = fsdlite.Signal()
-        obj.on_delete = fsdlite.Signal()
-        obj.on_facility = fsdlite.Signal()
-        obj.on_input_location = fsdlite.Signal()
-        obj.on_output_location = fsdlite.Signal()
-        obj.on_dirty = fsdlite.Signal()
+        obj.on_validate = signals.Signal()
+        obj.on_updated = signals.Signal()
+        obj.on_errors = signals.Signal()
+        obj.on_delete = signals.Signal()
+        obj.on_facility = signals.Signal()
+        obj.on_input_location = signals.Signal()
+        obj.on_output_location = signals.Signal()
+        obj.on_dirty = signals.Signal()
         obj.on_dirty.connect(obj.update)
         return obj
 

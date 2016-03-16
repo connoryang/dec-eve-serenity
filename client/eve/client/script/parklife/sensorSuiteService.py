@@ -1,6 +1,5 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\parklife\sensorSuiteService.py
 import math
-from brennivin.messenger import Messenger
 from carbon.common.lib import telemetry
 from carbon.common.lib.const import SEC
 from carbon.common.script.sys import service
@@ -29,6 +28,7 @@ from sensorsuite import common
 from sensorsuite.error import InvalidClientStateError
 import gametime
 import uthread2
+import signals
 SENSOR_SUITE_ENABLED = 'sensorSuiteEnabled'
 MAX_MOUSEOVER_RANGE = 40.0
 MAX_MOUSEOVER_RANGE_SQUARED = MAX_MOUSEOVER_RANGE ** 2
@@ -69,7 +69,7 @@ class SensorSuiteService(service.Service):
         service.Service.Run(self)
         self.isOverlayActive = True
         self.toggleLock = RLock()
-        self.messenger = Messenger()
+        self.messenger = signals.Messenger()
         self.gfxHandler = GfxHandler(self, self.sceneManager, self.michelle)
         self.siteController = SpaceSiteController(self, self.michelle)
         self.siteController.AddSiteHandler(ANOMALY, AnomalyHandler())
@@ -228,7 +228,7 @@ class SensorSuiteService(service.Service):
         mx, mz = myBall.x, myBall.z
         sitesOrdered = []
         pi2 = math.pi * 2
-        for siteData in self.siteController.GetVisibleSites():
+        for siteData in self.GetVisibleSites():
             self.LogInfo('checking site', siteData.siteID)
             if IsSiteInstantlyAccessible(siteData):
                 sitesOrdered.append((0, siteData))
@@ -243,6 +243,9 @@ class SensorSuiteService(service.Service):
 
         sitesOrdered.sort()
         return sitesOrdered
+
+    def GetVisibleSites(self):
+        return self.siteController.GetVisibleSites()
 
     def SetupSiteSweepAnimation(self, sitesOrdered):
         curveSet = animations.CreateCurveSet(useRealTime=False)
@@ -374,7 +377,7 @@ class SensorSuiteService(service.Service):
     def CreateResults(self):
         self.LogInfo('CreateResults')
         self.gfxHandler.WaitForSceneReady()
-        for siteData in self.siteController.GetVisibleSites():
+        for siteData in self.GetVisibleSites():
             self.siteController.AddSiteToSpace(siteData, animate=False)
 
     def GetLocationFlashCurve(self, delay):
@@ -387,6 +390,9 @@ class SensorSuiteService(service.Service):
 
         return (points, totalDuration)
 
+    def IsSiteBall(self, ballID):
+        return self.GetBracketByBallID(ballID) is not None
+
     def GetBracketByBallID(self, ballID):
         return self.siteController.spaceLocations.GetBracketByBallID(ballID)
 
@@ -397,6 +403,8 @@ class SensorSuiteService(service.Service):
         self.LogInfo('OnRefreshBookmarks')
         for siteType in (BOOKMARK, CORP_BOOKMARK):
             self.siteController.GetSiteHandler(siteType).UpdateSites(session.solarsystemid)
+
+        self.UpdateVisibleSites()
 
     def OnAgentMissionChanged(self, *args, **kwargs):
         self.siteController.GetSiteHandler(MISSION).UpdateSites(session.solarsystemid)

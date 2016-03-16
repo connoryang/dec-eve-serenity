@@ -253,6 +253,8 @@ class TreeDataShip(TreeDataInv):
         godmaType = sm.GetService('godma').GetType(typeID)
         if godmaType.droneCapacity or IsModularShip(typeID):
             shipData.append(TreeDataInv(parent=self, clsName='ShipDroneBay', itemID=itemID, cmdName=cmdName))
+        if godmaType.fighterCapacity:
+            shipData.append(TreeDataInv(parent=self, clsName='ShipFighterBay', itemID=itemID, cmdName=cmdName))
         godmaSM = sm.GetService('godma').GetStateManager()
         if bool(godmaSM.GetType(typeID).hasShipMaintenanceBay):
             shipData.append(TreeDataShipMaintenanceBay(parent=self, clsName='ShipMaintenanceBay', itemID=itemID))

@@ -115,6 +115,10 @@ class CharacterSelection(uicls.LayerCore):
         uthread.new(evetypes.GetTypeIDByNameDict)
         loggly.GetPermission()
         loggly.Initialize()
+        charId = blue.os.GetStartupArgValue('character')
+        if charId:
+            self.ready = True
+            self.ConfirmWithCharID(int(charId))
 
     def SetData(self, force = False):
         characterSelectionData = self.GetCharacterSelectionData(force=force)

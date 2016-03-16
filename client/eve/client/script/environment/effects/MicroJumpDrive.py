@@ -72,7 +72,7 @@ class MicroJumpDriveEngage(ShipEffect):
     def _TriggerPlaybackPlayer(self, delay):
         blue.synchro.SleepSim(delay - CAMERA_RESET_TIME)
         cam = sm.GetService('sceneManager').GetActiveSpaceCamera()
-        if cam.LookingAt() != session.shipid:
+        if cam.GetLookAtItemID() != session.shipid:
             cam.LookAt(session.shipid)
         blue.synchro.SleepSim(CAMERA_RESET_TIME)
         self.AddToScene(self.playerEffect)

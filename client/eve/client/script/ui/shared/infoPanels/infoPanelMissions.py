@@ -17,6 +17,7 @@ from eve.client.script.ui.services.menuSvcExtras.movementFunctions import WarpTo
 from carbonui.primitives.sprite import Sprite
 import trinity
 import uiutil
+from eve.common.script.util.notificationUtil import CreateLocationInfoLink, CreateTypeInfoLink
 
 class MissionInfo(Container):
 
@@ -128,16 +129,7 @@ class MissionInfo(Container):
             self.missionHint = localization.GetByLabel('UI/Agents/MissionTracker/MissionComplete', agent=agentLink)
             return
         if self.missionInfo[0] == 'TransportItemsPresent':
-            self.icon = Sprite(parent=parent, opacity=0.6, width=20, height=20, left=0, top=0, state=uiconst.UI_DISABLED, texturePath='res:/UI/Texture/classes/MissionTracker/tracker_dropoff.png')
-            self.iconTypeID = itemTypeID = int(self.missionInfo[1])
-            stationID = int(self.missionInfo[2])
-            sm.GetService('infoPanel').SetDestinationNotificationTrigger(stationID, bmInfo.agentID)
-            stationTypeID = cfg.eveowners.Get(stationID).typeID
-            stationName = cfg.evelocations.Get(stationID).name
-            itemTypeName = self.GetTypeName(self.iconTypeID)
-            destinationLink = localization.GetByLabel('UI/Contracts/ContractsWindow/ShowInfoLink', showInfoName=stationName, info=('showinfo', stationTypeID, stationID))
-            itemLink = localization.GetByLabel('UI/Contracts/ContractsWindow/ShowInfoLink', showInfoName=itemTypeName, info=('showinfo', itemTypeID))
-            self.missionHint = localization.GetByLabel('UI/Agents/MissionTracker/TransportItems', item=itemLink, destination=destinationLink)
+            self.ShowHintIconTransportItemsPresent(parent=parent, agentID=bmInfo.agentID)
             return
         if self.missionInfo[0] == 'TransportItemsMissing':
             self.icon = Sprite(parent=parent, opacity=0.6, width=20, height=20, left=0, top=0, state=uiconst.UI_DISABLED, texturePath='res:/UI/Texture/classes/MissionTracker/tracker_pickup.png')
@@ -229,6 +221,27 @@ class MissionInfo(Container):
             return
         self.missionHint = localization.GetByLabel('UI/Agents/MissionTracker/ReadJournal')
         self.icon = Sprite(parent=parent, opacity=0.6, width=20, height=20, left=0, top=0, state=uiconst.UI_DISABLED, texturePath='res:/UI/Texture/classes/MissionTracker/tracker_read.png')
+
+    def ShowHintIconTransportItemsPresent(self, parent, agentID):
+        self.icon = Sprite(parent=parent, opacity=0.6, width=20, height=20, left=0, top=0, state=uiconst.UI_DISABLED, texturePath='res:/UI/Texture/classes/MissionTracker/tracker_dropoff.png')
+        itemLink = 'item'
+        destinationLink = 'destination'
+        if len(self.missionInfo) > 1:
+            try:
+                self.iconTypeID = itemTypeID = int(self.missionInfo[1])
+                itemLink = CreateTypeInfoLink(itemTypeID)
+            except ValueError:
+                pass
+
+        if len(self.missionInfo) > 2 and agentID:
+            try:
+                locationID = int(self.missionInfo[2])
+                sm.GetService('infoPanel').SetDestinationNotificationTrigger(locationID, agentID)
+                destinationLink = CreateLocationInfoLink(locationID)
+            except ValueError:
+                pass
+
+        self.missionHint = localization.GetByLabel('UI/Agents/MissionTracker/TransportItems', item=itemLink, destination=destinationLink)
 
     def IsTypeIDInBallpark(self, typeID):
         ballpark = sm.GetService('michelle').GetBallpark()

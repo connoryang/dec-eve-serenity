@@ -1,7 +1,7 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\shared\vgs\controllers\offerPurchase.py
 from eve.client.script.ui.shared.vgs.events import LogPurchaseOffer
 import evetypes
-from fsdlite import Signal
+import signals
 from inventorycommon.const import groupShipSkins
 
 class PurchaseFailureError(Exception):
@@ -18,7 +18,7 @@ class OfferPurchaseController(object):
         self.offer = offer
         self.store = store
         self.account = store.GetAccount()
-        self.onAurBalanceChanged = Signal()
+        self.onAurBalanceChanged = signals.Signal()
         self.account.SubscribeToAurumBalanceChanged(self.onAurBalanceChanged)
 
     @property

@@ -2,7 +2,6 @@
 from carbonui.control.label import LabelCore
 from carbonui.primitives.container import Container
 from carbonui.primitives.base import ScaleDpi
-from eve.client.script.ui.camera.dungeonEditorCamera import DungeonEditorCamera
 from eve.client.script.ui.inflight.bracketsAndTargets.targetOnBracket import ActiveTargetOnBracket
 from eve.client.script.ui.inflight.bracketsAndTargets.targetOnBracket import TargetOnBracket
 from eve.client.script.ui.control.eveLabel import Label
@@ -455,10 +454,6 @@ class SimpleBracket(uiprimitives.Bracket):
 
     def OnClick(self, *args):
         if self.sr.clicktime and blue.os.TimeDiffInMs(self.sr.clicktime, blue.os.GetWallclockTime()) < 1000.0:
-            camera = sm.GetService('sceneManager').GetActiveCamera()
-            if isinstance(camera, DungeonEditorCamera) and camera.dungeonHack.IsFreeLook():
-                camera.LookAt(self.itemID)
-                return
             sm.GetService('state').SetState(self.itemID, state.selected, 1)
             slimItem = getattr(self, 'slimItem', None)
             if slimItem:

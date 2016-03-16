@@ -48,8 +48,9 @@ class TurretSvc(service.Service):
         if item.groupID in const.turretModuleGroups:
             ball.UnfitHardpoints()
             ball.FitHardpoints()
-            for turretSet in ball.turrets:
-                if len(targetSvc.targets) > 0:
+            targets = targetSvc.GetTargets()
+            if len(targets) > 0:
+                for turretSet in ball.turrets:
                     turretSet.SetTargetsAvailable(True)
                     turretSet.SetTarget(None, targetSvc.GetActiveTargetID())
 

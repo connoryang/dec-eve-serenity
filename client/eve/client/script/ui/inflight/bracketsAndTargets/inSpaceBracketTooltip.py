@@ -453,15 +453,15 @@ class BracketTooltipRow(BracketTooltipRowBase):
             return
         ball = self.bracket.ball
         slimItem = self.bracket.slimItem
-        if not (ball or slimItem):
+        if slimItem:
+            self.iconObj.UpdateSpaceObjectIcon(slimItem, ball)
+            self.iconObj.UpdateSpaceObjectIconColor(slimItem, ball)
+            self.iconObj.UpdateSpaceObjectState(slimItem, ball)
+            self.iconObj.UpdateSpaceObjectFlagAndBackgroundColor(slimItem, ball)
+        else:
             iconNo = getattr(self.bracket, 'iconNo', None)
             if iconNo:
                 self.iconObj.iconSprite.LoadIcon(iconNo)
-            return
-        self.iconObj.UpdateSpaceObjectIcon(slimItem, ball)
-        self.iconObj.UpdateSpaceObjectIconColor(slimItem, ball)
-        self.iconObj.UpdateSpaceObjectState(slimItem, ball)
-        self.iconObj.UpdateSpaceObjectFlagAndBackgroundColor(slimItem, ball)
 
     def SetSelected(self, selectedState):
         if selectedState:

@@ -9,8 +9,7 @@ from eve.client.script.ui.control.eveLabel import EveLabelMedium
 import carbonui.const as uiconst
 import blue
 from eve.client.script.ui.control.themeColored import FillThemeColored, StretchSpriteHorizontalThemeColored
-from eve.client.script.ui.shared.mapView.dockPanelConst import SETTINGSKEY
-from eve.client.script.ui.shared.mapView.dockPanelUtil import GetDockPanelManager
+from eve.client.script.ui.shared.mapView.dockPanelUtil import GetDockPanelManager, GetPanelSettings, RegisterPanelSettings
 from eve.client.script.ui.view.viewStateConst import ViewState
 import localization
 import uthread
@@ -28,22 +27,6 @@ BUTTON_DATA_BY_ID = {BUTTON_FULLSCREEN: ('res:/UI/Texture/classes/DockPanel/full
  BUTTON_FLOAT: ('res:/UI/Texture/classes/DockPanel/floatButton.png', 'UI/Control/DockPanel/Floating')}
 SNAP_RELEASE_THRESHOLD = 5
 SNAP_INDICATOR_SIZE = 2
-
-def GetPanelSettings(panelID):
-    defaultSettings = {'align': uiconst.TOPLEFT,
-     'dblToggleFullScreenAlign': uiconst.TOPLEFT,
-     'positionX': 0.5,
-     'positionY': 0.5,
-     'widthProportion': 0.8,
-     'heightProportion': 0.8,
-     'widthProportion_docked': 0.5,
-     'heightProportion_docked': 1.0,
-     'pushedBy': []}
-    if panelID:
-        registered = settings.char.ui.Get(SETTINGSKEY % panelID, {})
-        defaultSettings.update(registered)
-    return defaultSettings
-
 
 class DockablePanelHeaderButton(ButtonIcon):
     default_width = 16
@@ -374,7 +357,7 @@ class DockablePanel(Window):
         elif self.align in (uiconst.TOLEFT, uiconst.TORIGHT):
             current['widthProportion_docked'] = self.width / float(uicore.desktop.width)
             current['heightProportion_docked'] = 1.0
-        settings.char.ui.Set(SETTINGSKEY % self.panelID, current)
+        RegisterPanelSettings(self.panelID, current)
         if self.align in (uiconst.TOLEFT, uiconst.TORIGHT):
             uicore.dockablePanelManager.UpdatePanelsPushedBySettings()
         self.dockViewModeButton.UpdateButtonState()
@@ -412,7 +395,7 @@ class DockablePanel(Window):
         if self.IsFullscreen():
             currentSettings = self.GetPanelSettings()
             currentSettings['align'] = currentSettings['dblToggleFullScreenAlign']
-            settings.char.ui.Set(SETTINGSKEY % self.panelID, currentSettings)
+            RegisterPanelSettings(self.panelID, currentSettings)
             self.InitDockPanelPosition()
         else:
             self.DockFullscreen()

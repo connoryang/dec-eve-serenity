@@ -58,8 +58,6 @@ class SceneContainer(Base):
         if scenePath is None:
             scenePath = 'res:/dx9/scene/fitting/previewAmmo.red'
         self.scene = trinity.Load(scenePath)
-        if gfxutils.BlockStarfieldOnLionOSX():
-            self.scene.starfield = None
         self.frontClip = 1.0
         self.backClip = 350000.0
         self.fieldOfView = 1.0

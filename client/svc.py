@@ -141,6 +141,7 @@ from eve.client.script.industry.facilitySvc import FacilityService as facilitySv
 from eve.client.script.industry.industrySvc import IndustryService as industrySvc
 from eve.client.script.movement.apertureClient import ApertureClient as apertureClient
 from eve.client.script.movement.eveMovementClient import EveMovementClient as eveMovementClient
+from eve.client.script.parklife.areaWeapon import AreaWeaponSvc as areaWeapon
 from eve.client.script.parklife.autopilot import AutoPilot as autoPilot
 from eve.client.script.parklife.billboardMgr import BillboardMgr as billboard
 from eve.client.script.parklife.bracketMgr import BracketMgr as bracket
@@ -148,6 +149,7 @@ from eve.client.script.parklife.consider import ConsiderSvc as consider
 from eve.client.script.parklife.damageSvc import DamageService as damage
 from eve.client.script.parklife.districtSvc import DistrictSvc as district
 from eve.client.script.parklife.dungeonTracking import DungeonTracking as dungeonTracking
+from eve.client.script.parklife.fightersSvc import FightersSvc as fighters
 from eve.client.script.parklife.fleetSvc import FleetSvc as fleet
 from eve.client.script.parklife.fxSequencer import FxSequencer
 from eve.client.script.parklife.gameui import GameUI as gameui

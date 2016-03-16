@@ -5,7 +5,7 @@ import moniker
 import uicls
 import uthread
 import blue
-from crimewatch.const import targetGroupsWithSuspectPenaltyInHighSec
+from crimewatch.const import containerGroupsWithLootRights
 from crimewatch.util import IsItemFreeForAggression
 
 class CrimewatchService(service.Service):
@@ -335,10 +335,7 @@ class CrimewatchService(service.Service):
             bp = self.michelle.GetBallpark()
             item = bp.GetInvItem(containerID)
             if item is not None:
-                if item.groupID in (const.groupWreck,
-                 const.groupCargoContainer,
-                 const.groupFreightContainer,
-                 const.groupSpewContainer):
+                if item.groupID in containerGroupsWithLootRights:
                     bp = self.michelle.GetBallpark()
                     if bp and not bp.HaveLootRight(containerID):
                         return False

@@ -2,7 +2,7 @@
 import carbonui.const as uiconst
 import dogma.const
 import eve.common.lib.appConst as appConst
-import fsdlite
+import signals
 import industry
 import itertools
 import logging
@@ -105,8 +105,8 @@ class VgsOfferPreview(Container):
         self.offer = attributes.offer
         self._charID = None
         self._typeID = None
-        self.on_charid = fsdlite.Signal()
-        self.on_typeid = fsdlite.Signal()
+        self.on_charid = signals.Signal()
+        self.on_typeid = signals.Signal()
         self.on_charid.connect(self.OnPickCharacter)
         self.on_typeid.connect(self.OnPickType)
         self.charButtons = []

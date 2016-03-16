@@ -1,5 +1,6 @@
 #Embedded file name: e:\jenkins\workspace\client_SERENITY\branches\release\SERENITY\eve\client\script\ui\inflight\target.py
 from eve.client.script.ui.shared.stateFlag import AddAndSetFlagIcon
+from gametime import GetDurationInClient, GetSimTime
 import uicontrols
 import blue
 import uiprimitives
@@ -164,7 +165,10 @@ class Target(uiprimitives.Container):
     def OnJamStart(self, sourceBallID, moduleID, targetBallID, jammingType, startTime, duration):
         if jammingType not in self.jammers:
             self.jammers[jammingType] = {}
-        self.jammers[jammingType][sourceBallID, moduleID, targetBallID] = (startTime, duration)
+        durationInClient = GetDurationInClient(startTime, duration)
+        if durationInClient < 0.0:
+            return
+        self.jammers[jammingType][sourceBallID, moduleID, targetBallID] = (GetSimTime(), durationInClient)
         self.CheckJam()
 
     def OnJamEnd(self, sourceBallID, moduleID, targetBallID, jammingType):
